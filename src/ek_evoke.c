@@ -39,18 +39,18 @@ typedef struct
     bool broadcast;
 } _defer_req_t;
 
-static volatile uint32_t _sleep_lock;
-static volatile uint32_t _event_tick_base;
-static volatile uint32_t _event_tick_diff;
-static volatile uint32_t _defer_earilest_tick;
-static volatile bool _defer_evt_wakeup;
+static volatile uint32_t s_sleep_lock;
+static volatile uint32_t s_event_tick_base;
+static volatile uint32_t s_event_tick_diff;
+static volatile uint32_t s_defer_earliest_tick;
+static volatile bool s_defer_evt_wakeup;
 
-static _defer_req_t _defer_req_pool[EK_EVOKE_MAX_DEFER_REQ];
-static ek_list_node_t _defer_pool_free_list;
-static ek_ringbuf_spsc_t *_isr_fifo;
+static _defer_req_t s_defer_req_pool[EK_EVOKE_MAX_DEFER_REQ];
+static ek_list_node_t s_defer_pool_free_list;
+static ek_ringbuf_spsc_t *s_isr_fifo;
 
-static ek_list_node_t _ready_task_list;
-static ek_list_node_t _defer_evt_list;
+static ek_list_node_t s_ready_task_list;
+static ek_list_node_t s_defer_evt_list;
 
 static _defer_req_t *_defer_req_malloc(void);
 static void _defer_req_free(_defer_req_t *req);
@@ -58,45 +58,45 @@ static void _defer_req_free(_defer_req_t *req);
 __EK_STATIC_INLINE void _ek_evoke_set_timer(uint32_t xtick)
 {
     ek_evoke_set_timer(xtick);
-    _event_tick_diff = xtick;
+    s_event_tick_diff = xtick;
 }
 
-void ek_evoke_sleep_lock(void)
+void ek_evokes_sleep_lock(void)
 {
-    _sleep_lock++;
+    s_sleep_lock++;
 }
 
 void ek_evoke_sleep_unlock(void)
 {
-    if (_sleep_lock) _sleep_lock--;
+    if (s_sleep_lock) s_sleep_lock--;
     else EK_LOG_WARN("the sleep lock is 0, fail to decrease the sleep lock");
 }
 
 void ek_evoke_delay_timer_callback(void)
 {
-    _defer_evt_wakeup = true;
-    _event_tick_base += _event_tick_diff;
-    _event_tick_diff = 0;
+    s_defer_evt_wakeup = true;
+    s_event_tick_base += s_event_tick_diff;
+    s_event_tick_diff = 0;
 }
 
 void ek_evoke_init(void)
 {
-    ek_list_init(&_ready_task_list);
-    ek_list_init(&_defer_evt_list);
-    ek_list_init(&_defer_pool_free_list);
+    ek_list_init(&s_ready_task_list);
+    ek_list_init(&s_defer_evt_list);
+    ek_list_init(&s_defer_pool_free_list);
 
     for (size_t i = 0; i < EK_EVOKE_MAX_DEFER_REQ; i++)
     {
-        ek_list_insert_tail(&_defer_pool_free_list, &_defer_req_pool[i].node);
+        ek_list_insert_tail(&s_defer_pool_free_list, &s_defer_req_pool[i].node);
     }
 
-    _isr_fifo = ek_ringbuf_create_spsc(sizeof(_isr_req_t), EK_EVOKE_MAX_ISR_REQ);
-    ek_assert_param(_isr_fifo != NULL);
+    s_isr_fifo = ek_ringbuf_create_spsc(sizeof(_isr_req_t), EK_EVOKE_MAX_ISR_REQ);
+    ek_assert_param(s_isr_fifo != NULL);
 
-    _defer_earilest_tick = UINT32_MAX;
-    _event_tick_base = 0;
-    _sleep_lock = 0;
-    _defer_evt_wakeup = false;
+    s_defer_earliest_tick = UINT32_MAX;
+    s_event_tick_base = 0;
+    s_sleep_lock = 0;
+    s_defer_evt_wakeup = false;
 }
 
 EK_EXPORT_COMPONENTS(ek_evoke_init);
@@ -167,7 +167,7 @@ bool ek_evoke_event_subscribe(ek_evoke_task_handle_t tsk, ek_evoke_event_handle_
     if (evt->count && ek_list_is_empty(&evt->wait_list))
     {
         evt->count--;
-        ek_list_insert_tail(&_ready_task_list, &tsk->node);
+        ek_list_insert_tail(&s_ready_task_list, &tsk->node);
         tsk->state = EK_EVOKE_STATE_READY;
 
         return true;
@@ -199,7 +199,7 @@ void ek_evoke_event_broadcast(ek_evoke_event_handle_t evt, void *payload)
         ek_list_node_t *node = ek_list_get_first(&evt->wait_list);
         ek_evoke_task_t *tsk = ek_list_container(node, ek_evoke_task_t, node);
         ek_list_remove(node);
-        ek_list_insert_tail(&_ready_task_list, node);
+        ek_list_insert_tail(&s_ready_task_list, node);
         tsk->state = EK_EVOKE_STATE_READY;
     }
 }
@@ -215,7 +215,7 @@ void ek_evoke_event_publish(ek_evoke_event_handle_t evt, void *payload)
         ek_list_node_t *node = ek_list_get_first(&evt->wait_list);
         ek_evoke_task_t *tsk = ek_list_container(node, ek_evoke_task_t, node);
         ek_list_remove(node);
-        ek_list_insert_tail(&_ready_task_list, node);
+        ek_list_insert_tail(&s_ready_task_list, node);
         tsk->state = EK_EVOKE_STATE_READY;
 
         return;
@@ -241,7 +241,7 @@ void ek_evoke_event_defer(ek_evoke_event_handle_t evt, void *payload, uint32_t d
         EK_LOG_WARN("the defer request pool is empty, fail to create a defer request");
         return;
     }
-    uint32_t wakeup_tick = delay + _event_tick_base;
+    uint32_t wakeup_tick = delay + s_event_tick_base;
 
     req->evt = evt;
     req->broadcast = broadcast;
@@ -249,7 +249,7 @@ void ek_evoke_event_defer(ek_evoke_event_handle_t evt, void *payload, uint32_t d
     req->wakeup_tick = wakeup_tick;
 
     ek_list_node_t *pos;
-    ek_list_foreach(pos, &_defer_evt_list)
+    ek_list_foreach(pos, &s_defer_evt_list)
     {
         _defer_req_t *pos_req = ek_list_container(pos, _defer_req_t, node);
         if (pos_req->wakeup_tick >= wakeup_tick) break;
@@ -268,7 +268,7 @@ void ek_evoke_event_broadcast_from_isr(ek_evoke_event_handle_t evt, void *payloa
         .evt = evt,
         .payload = payload,
     };
-    ek_ringbuf_write_spsc(_isr_fifo, &req);
+    ek_ringbuf_write_spsc(s_isr_fifo, &req);
 
     ek_evoke_exit_critical();
 }
@@ -284,7 +284,7 @@ void ek_evoke_event_publish_from_isr(ek_evoke_event_handle_t evt, void *payload)
         .evt = evt,
         .payload = payload,
     };
-    ek_ringbuf_write_spsc(_isr_fifo, &req);
+    ek_ringbuf_write_spsc(s_isr_fifo, &req);
 
     ek_evoke_exit_critical();
 }
@@ -302,7 +302,7 @@ void ek_evoke_event_defer_from_isr(ek_evoke_event_handle_t evt, void *payload, u
         .payload = payload,
         .delay = delay,
     };
-    ek_ringbuf_write_spsc(_isr_fifo, &req);
+    ek_ringbuf_write_spsc(s_isr_fifo, &req);
 
     ek_evoke_exit_critical();
 }
@@ -313,10 +313,10 @@ void ek_evoke_event_loop(void)
     {
         // 先处理是否有来自中断的请求
         // 从中断请求fifo中读取
-        while (!ek_ringbuf_empty_spsc(_isr_fifo))
+        while (!ek_ringbuf_empty_spsc(s_isr_fifo))
         {
             _isr_req_t req = { 0 };
-            if (ek_ringbuf_read_spsc(_isr_fifo, &req))
+            if (ek_ringbuf_read_spsc(s_isr_fifo, &req))
             {
                 if (req.type & ISR_REQ_PUBLISH)
                 {
@@ -334,9 +334,9 @@ void ek_evoke_event_loop(void)
         // 首先检查就绪链表是否为空
         // 如果不为空则执行所有到期任务
         // 如果为空就直接去检查延时链表
-        while (!ek_list_is_empty(&_ready_task_list))
+        while (!ek_list_is_empty(&s_ready_task_list))
         {
-            ek_list_node_t *node = ek_list_get_first(&_ready_task_list);
+            ek_list_node_t *node = ek_list_get_first(&s_ready_task_list);
             ek_evoke_task_t *tsk = ek_list_container(node, ek_evoke_task_t, node);
             ek_list_remove(&tsk->node);
             tsk->state = EK_EVOKE_STATE_RUNNING;
@@ -347,53 +347,53 @@ void ek_evoke_event_loop(void)
 
         // 检查延时链表
         // 如果有延时的事件，则取出最早的唤醒事件然后设置中断时间
-        if (!ek_list_is_empty(&_defer_evt_list))
+        if (!ek_list_is_empty(&s_defer_evt_list))
         {
-            ek_list_node_t *node = ek_list_get_first(&_defer_evt_list);
+            ek_list_node_t *node = ek_list_get_first(&s_defer_evt_list);
             _defer_req_t *req = ek_list_container(node, _defer_req_t, node);
-            if (req->wakeup_tick != _defer_earilest_tick)
+            if (req->wakeup_tick != s_defer_earliest_tick)
             {
-                _defer_earilest_tick = req->wakeup_tick;
-                _ek_evoke_set_timer(_defer_earilest_tick - _event_tick_base);
+                s_defer_earliest_tick = req->wakeup_tick;
+                _ek_evoke_set_timer(s_defer_earliest_tick - s_event_tick_base);
             }
         }
 
         // 检查睡眠锁，根据锁的状态来执行不同的睡眠状态
         // 如果有锁没有释放，则去浅睡眠 WFI
         // 如果所有的锁都释放了，则进行深度睡眠
-        if (_sleep_lock) ek_evoke_light_sleep();
+        if (s_sleep_lock) ek_evoke_light_sleep();
         else ek_evoke_deep_sleep();
 
         // 中断唤醒，要去检查是否有延时事件被唤醒
         // 如果有，则依次唤醒
         // 并且要去检查是否有其他同样唤醒时间的事件
         // 如果有，一并发布
-        if (_defer_evt_wakeup)
+        if (s_defer_evt_wakeup)
         {
-            _defer_evt_wakeup = false;
+            s_defer_evt_wakeup = false;
 
-            while (!ek_list_is_empty(&_defer_evt_list))
+            while (!ek_list_is_empty(&s_defer_evt_list))
             {
-                ek_list_node_t *node = ek_list_get_first(&_defer_evt_list);
+                ek_list_node_t *node = ek_list_get_first(&s_defer_evt_list);
                 _defer_req_t *req = ek_list_container(node, _defer_req_t, node);
 
-                if (req->wakeup_tick > _defer_earilest_tick) break;
+                if (req->wakeup_tick > s_defer_earliest_tick) break;
 
                 ek_list_remove(node);
                 if (req->broadcast) ek_evoke_event_broadcast(req->evt, req->payload);
                 else ek_evoke_event_publish(req->evt, req->payload);
                 _defer_req_free(req);
             }
-            _defer_earilest_tick = UINT32_MAX;
+            s_defer_earliest_tick = UINT32_MAX;
         }
     }
 }
 
 static _defer_req_t *_defer_req_malloc(void)
 {
-    if (!ek_list_is_empty(&_defer_pool_free_list))
+    if (!ek_list_is_empty(&s_defer_pool_free_list))
     {
-        ek_list_node_t *node = ek_list_get_first(&_defer_pool_free_list);
+        ek_list_node_t *node = ek_list_get_first(&s_defer_pool_free_list);
         ek_list_remove(node);
         _defer_req_t *req = ek_list_container(node, _defer_req_t, node);
         return req;
@@ -403,7 +403,7 @@ static _defer_req_t *_defer_req_malloc(void)
 
 static void _defer_req_free(_defer_req_t *req)
 {
-    ek_list_insert_tail(&_defer_pool_free_list, &req->node);
+    ek_list_insert_tail(&s_defer_pool_free_list, &req->node);
 }
 
 __EK_WEAK void ek_evoke_enter_critical(void)

@@ -21,7 +21,7 @@
             if ((idx) > (len)) (idx) = (len); \
         } while (0)
 
-static ek_err_t _ek_str_ensure_cap(ek_str_t *s, uint32_t len);
+static ek_err_t _str_ensure_cap(ek_str_t *s, uint32_t len);
 
 ek_str_t *ek_str_create(const char *str)
 {
@@ -72,7 +72,7 @@ ek_err_t ek_str_append_len(ek_str_t *s, const char *str, uint32_t len)
     ek_assert_param(str != NULL);
     ek_assert_param(len != 0);
 
-    EK_RETURN_IF_ERR(_ek_str_ensure_cap(s, s->len + len + 1));
+    EK_RETURN_IF_ERR(_str_ensure_cap(s, s->len + len + 1));
     memcpy(s->buf + s->len, str, len);
 
     s->len += len;
@@ -93,7 +93,7 @@ ek_err_t ek_str_append_fmt(ek_str_t *s, const char *fmt, ...)
 
     if (len < 0) return EK_ERR_PARSE;
 
-    EK_RETURN_IF_ERR(_ek_str_ensure_cap(s, s->len + len));
+    EK_RETURN_IF_ERR(_str_ensure_cap(s, s->len + len));
 
     va_start(args, fmt);
     // +1 给 \0
@@ -212,7 +212,7 @@ int ek_str_ncmp(ek_str_t *s1, ek_str_t *s2, size_t n)
     return strncmp(ek_str_get_cstring(s1), ek_str_get_cstring(s2), n);
 }
 
-static ek_err_t _ek_str_ensure_cap(ek_str_t *s, uint32_t len)
+static ek_err_t _str_ensure_cap(ek_str_t *s, uint32_t len)
 {
     ek_assert_param(s != NULL);
 

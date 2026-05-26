@@ -14,25 +14,25 @@
 #    define EK_LOG_COLOR_BLUE   "\033[94m"
 #    define EK_LOG_COLOR_GREEN  "\033[92m"
 
-#    define EK_LOG_CHECK_LOCK() (_lock == 1)
-#    define EK_LOG_LOCK()       (_lock = 1)
-#    define EK_LOG_UNLOCK()     (_lock = 0)
+#    define EK_LOG_CHECK_LOCK() (s_lock == 1)
+#    define EK_LOG_LOCK()       (s_lock = 1)
+#    define EK_LOG_UNLOCK()     (s_lock = 0)
 
-static uint8_t _lock = 0;
+static uint8_t s_lock = 0;
 
 #    if (EKCFG_LOG_COLOR == 1)
 
-static const char *const ek_log_color_table[EK_LOG_TYPE_MAX] = {
+static const char *const s_log_color_table[EK_LOG_TYPE_MAX] = {
     EK_LOG_COLOR_NONE, EK_LOG_COLOR_GREEN, EK_LOG_COLOR_BLUE, EK_LOG_COLOR_YELLOW, EK_LOG_COLOR_RED,
 };
 
 #    endif /* (EKCFG_LOG_COLOR == 1) */
 
-static const char *ek_log_type_table[EK_LOG_TYPE_MAX] = {
+static const char *s_log_type_table[EK_LOG_TYPE_MAX] = {
     "None", "Debug", "Info", "Warn", "Error",
 };
 
-static char ek_log_buffer[EKCFG_LOG_BUF_SIZE];
+static char s_log_buffer[EKCFG_LOG_BUF_SIZE];
 
 __EK_WEAK uint32_t _ek_log_get_tick(void)
 {
@@ -47,17 +47,17 @@ void _ek_log_printf(const char *tag, uint32_t line, ek_log_type_t type, uint32_t
 
 #    if (EKCFG_LOG_COLOR == 1)
     ek_printf(
-        "%s[%s/%s L:%" PRIu32 ",T:%" PRIu32 "]:", ek_log_color_table[type], ek_log_type_table[type], tag, line, tick);
+        "%s[%s/%s L:%" PRIu32 ",T:%" PRIu32 "]:", s_log_color_table[type], s_log_type_table[type], tag, line, tick);
 #    else /* EKCFG_LOG_COLOR == 1 */
-    ek_printf("[%s/%s L:%" PRIu32 ",T:%" PRIu32 "]:", ek_log_type_table[type], tag, line, tick);
+    ek_printf("[%s/%s L:%" PRIu32 ",T:%" PRIu32 "]:", s_log_type_table[type], tag, line, tick);
 #    endif /* EKCFG_LOG_COLOR == 1 */
 
     va_list args;
     va_start(args, fmt);
-    ek_vsnprintf(ek_log_buffer, EKCFG_LOG_BUF_SIZE - 1, fmt, args);
+    ek_vsnprintf(s_log_buffer, EKCFG_LOG_BUF_SIZE - 1, fmt, args);
     va_end(args);
 
-    ek_printf("%s", ek_log_buffer);
+    ek_printf("%s", s_log_buffer);
 
 #    if (EKCFG_LOG_COLOR == 1)
     ek_printf(EK_LOG_COLOR_NONE); // 恢复日志颜色

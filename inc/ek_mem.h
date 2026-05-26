@@ -55,8 +55,8 @@ void ek_free(void *ptr);
 
 #    include "../../third_party/tlsf/tlsf.h"
 
-extern uint8_t ek_default_heap[];
-extern tlsf_t ek_default_tlsf;
+extern uint8_t g_g_ek_default_heap[];
+extern tlsf_t g_g_ek_default_tlsf;
 
 /**
  * @brief  初始化默认内存堆
@@ -66,8 +66,8 @@ extern tlsf_t ek_default_tlsf;
 #        define ek_heap_init()                                                             \
             do                                                                             \
             {                                                                              \
-                ek_default_tlsf = tlsf_create_with_pool(ek_default_heap, EKCFG_HEAP_SIZE); \
-                while (ek_default_tlsf == NULL);                                           \
+                g_ek_default_tlsf = tlsf_create_with_pool(g_ek_default_heap, EKCFG_HEAP_SIZE); \
+                while (g_ek_default_tlsf == NULL);                                           \
             } while (0)
 #    endif
 
@@ -83,7 +83,7 @@ extern tlsf_t ek_default_tlsf;
  * @brief  销毁默认内存堆
  */
 #    ifndef ek_heap_destory
-#        define ek_heap_destory() tlsf_destroy(ek_default_tlsf)
+#        define ek_heap_destory() tlsf_destroy(g_ek_default_tlsf)
 #    endif
 
 /**
@@ -92,7 +92,7 @@ extern tlsf_t ek_default_tlsf;
  * @param  size: 内存池大小（字节）
  */
 #    ifndef ek_heap_add_pool
-#        define ek_heap_add_pool(ptr, size) tlsf_add_pool(ek_default_tlsf, (ptr), (size))
+#        define ek_heap_add_pool(ptr, size) tlsf_add_pool(g_ek_default_tlsf, (ptr), (size))
 #    endif
 
 /**
@@ -100,7 +100,7 @@ extern tlsf_t ek_default_tlsf;
  * @param  pool: 要移除的内存池指针
  */
 #    ifndef ek_heap_remove_pool
-#        define ek_heap_remove_pool(pool) tlsf_remove_pool(ek_default_tlsf, (pool))
+#        define ek_heap_remove_pool(pool) tlsf_remove_pool(g_ek_default_tlsf, (pool))
 #    endif
 
 /**

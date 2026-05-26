@@ -60,57 +60,60 @@
  * ==================================================================================
  */
 
-uint8_t ek_default_heap[EKCFG_HEAP_SIZE];
-tlsf_t ek_default_tlsf;
+uint8_t g_ek_default_heap[EKCFG_HEAP_SIZE];
+tlsf_t g_ek_default_tlsf;
 
-static size_t ek_unused_bytes = 0;
-static size_t ek_used_bytes = 0;
+static size_t s_unused_bytes = 0;
+static size_t s_used_bytes = 0;
+
+/* 前向声明 */
+static void _mem_walker(void *ptr, size_t size, int used, void *user);
 
 __EK_WEAK void *ek_malloc(size_t size)
 {
-    return tlsf_malloc(ek_default_tlsf, size);
+    return tlsf_malloc(g_ek_default_tlsf, size);
 }
 
 __EK_WEAK void *ek_realloc(void *ptr, size_t size)
 {
-    return tlsf_realloc(ek_default_tlsf, ptr, size);
+    return tlsf_realloc(g_ek_default_tlsf, ptr, size);
 }
 
 __EK_WEAK void ek_free(void *ptr)
 {
-    tlsf_free(ek_default_tlsf, ptr);
+    tlsf_free(g_ek_default_tlsf, ptr);
 }
 
-// walker 函数：统计空闲内存
-static void ek_mem_walker(void *ptr, size_t size, int used, void *user)
+size_t ek_heap_unused(void)
+{
+    pool_t pool = tlsf_get_pool(g_ek_default_tlsf);
+    s_unused_bytes = 0;
+    tlsf_walk_pool(pool, _mem_walker, NULL);
+    return s_unused_bytes;
+}
+
+size_t ek_heap_used(void)
+{
+    pool_t pool = tlsf_get_pool(g_ek_default_tlsf);
+    s_used_bytes = 0;
+    tlsf_walk_pool(pool, _mem_walker, NULL);
+    return s_used_bytes;
+}
+
+/* 静态函数实现 */
+static void _mem_walker(void *ptr, size_t size, int used, void *user)
 {
     __EK_UNUSED(ptr);
     __EK_UNUSED(user);
 
     if (!used)
     {
-        ek_unused_bytes += size;
+        s_unused_bytes += size;
     }
     else
     {
-        ek_used_bytes += size;
+        s_used_bytes += size;
     }
-}
-
-size_t ek_heap_unused(void)
-{
-    pool_t pool = tlsf_get_pool(ek_default_tlsf);
-    ek_unused_bytes = 0;
-    tlsf_walk_pool(pool, ek_mem_walker, NULL);
-    return ek_unused_bytes;
-}
-
-size_t ek_heap_used(void)
-{
-    pool_t pool = tlsf_get_pool(ek_default_tlsf);
-    ek_used_bytes = 0;
-    tlsf_walk_pool(pool, ek_mem_walker, NULL);
-    return ek_used_bytes;
 }
 
 #endif /* EKCFG_HEAP_TLSF */

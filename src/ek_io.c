@@ -10,11 +10,20 @@
 
 #    include "../inc/ek_def.h"
 
+/* 前向声明 */
+static int _ek_io_printf(int ch, lwprintf_t *lwp);
+
 __EK_WEAK void _ek_io_fputc(int ch)
 {
     __EK_UNUSED(ch);
 }
 
+void ek_io_init(void)
+{
+    lwprintf_init(_ek_io_printf);
+}
+
+/* 静态函数实现 */
 static int _ek_io_printf(int ch, lwprintf_t *lwp)
 {
     __EK_UNUSED(lwp);
@@ -23,11 +32,6 @@ static int _ek_io_printf(int ch, lwprintf_t *lwp)
         _ek_io_fputc(ch);
     }
     return ch;
-}
-
-void ek_io_init(void)
-{
-    lwprintf_init(_ek_io_printf);
 }
 
 #elif EKCFG_PICOLIBC == 1
