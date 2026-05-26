@@ -8,10 +8,10 @@
 
 #if EKCFG_STR == 1
 
-#    include "../inc/ek_io.h"
-#    include "../inc/ek_mem.h"
-#    include "../inc/ek_err.h"
-#    include "../inc/ek_assert.h"
+#    include "ek_io.h"
+#    include "ek_heap.h"
+#    include "ek_err.h"
+#    include "ek_assert.h"
 
 #    define INDEX_CLAMP(idx, len)             \
         do                                    \

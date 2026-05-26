@@ -13,7 +13,7 @@
 
 #if EKCFG_PICOLIBC == 1
 
-#    include "ek_mem.h"
+#    include "ek_heap.h"
 #    include "ek_io.h"
 
 /* ========== 场景 A: TLSF 分配器，picolibc 调用走 TLSF ========== */

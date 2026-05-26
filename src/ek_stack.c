@@ -8,9 +8,9 @@
 
 #if EKCFG_STACK == 1
 
-#    include "../inc/ek_err.h"
-#    include "../inc/ek_assert.h"
-#    include "../inc/ek_mem.h"
+#    include "ek_err.h"
+#    include "ek_assert.h"
+#    include "ek_heap.h"
 
 #    if EKCFG_RTOS == 1
 #        define EK_LOCKUP(psk)    ((psk)->lock = true)

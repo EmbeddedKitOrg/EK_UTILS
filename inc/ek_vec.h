@@ -18,7 +18,7 @@
 #if EKCFG_VEC == 1
 
 #    include "ek_def.h"
-#    include "ek_mem.h"
+#    include "ek_heap.h"
 
 /**
  * @brief 大数组扩容阈值

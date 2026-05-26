@@ -8,7 +8,7 @@
 
 #if (EKCFG_RINGBUF == 1) || (EKCFG_RINGBUF_SPSC == 1)
 
-#    include "ek_mem.h"
+#    include "ek_heap.h"
 #    include "ek_assert.h"
 #    include "ek_err.h"
 

@@ -8,7 +8,7 @@
 
 #if (EKCFG_EXPORT == 1)
 
-#    include "../inc/ek_assert.h"
+#    include "ek_assert.h"
 
 extern _ek_export_init_fn_t _ek_export_fn_start;
 extern _ek_export_init_fn_t _ek_export_fn_end;
