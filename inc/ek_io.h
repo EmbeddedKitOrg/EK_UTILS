@@ -46,6 +46,25 @@ void ek_io_init(void);
 #    define ek_snprintf  lwsnprintf
 #    define ek_vsnprintf lwvsnprintf
 
+#elif EK_USE_PICOLIBC == 1
+
+/**
+ * @brief 定义字符输出函数（picolibc 模式）
+ * @note 用户需要实现此函数，用于底层字符输出（如 UART）
+ */
+#    define EK_IO_FPUTC() void _ek_io_fputc(int ch)
+
+/**
+ * @brief 初始化 I/O 系统（picolibc 模式下无需初始化）
+ */
+void ek_io_init(void);
+
+#    define ek_printf     printf
+#    define ek_vprintf    vprintf
+#    define ek_sprintf    sprintf
+#    define ek_snprintf   snprintf
+#    define ek_vsnprintf  vsnprintf
+
 #else
 
 void ek_io_init(void);

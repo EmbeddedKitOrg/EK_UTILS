@@ -66,12 +66,12 @@ tlsf_t ek_default_tlsf;
 static size_t ek_unused_bytes = 0;
 static size_t ek_used_bytes = 0;
 
-__EK_WEAK void *_ek_malloc(size_t size)
+__EK_WEAK void *ek_malloc(size_t size)
 {
     return tlsf_malloc(ek_default_tlsf, size);
 }
 
-__EK_WEAK void *_ek_realloc(void *ptr, size_t size)
+__EK_WEAK void *ek_realloc(void *ptr, size_t size)
 {
     return tlsf_realloc(ek_default_tlsf, ptr, size);
 }

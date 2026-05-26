@@ -30,11 +30,23 @@ void ek_io_init(void)
     lwprintf_init(_ek_io_printf);
 }
 
-#else
-// 如果不使用lwprintf作为IO库，需要自己在这里实现
+#elif EK_USE_PICOLIBC == 1
+
+#    include "../inc/ek_def.h"
+
+__EK_WEAK void _ek_io_fputc(int ch)
+{
+    __EK_UNUSED(ch);
+}
 
 void ek_io_init(void)
 {
 }
 
-#endif /* EK_IO_NO_LWPRTF */
+#else
+
+void ek_io_init(void)
+{
+}
+
+#endif

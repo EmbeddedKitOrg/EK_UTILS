@@ -29,6 +29,17 @@
 #define EK_IO_NO_LWPRTF (0)
 
 /* ========================================================================
+ * picolibc 配置
+ * - EK_USE_PICOLIBC: 设置为1表示使用 picolibc 替代标准 libc
+ * ======================================================================== */
+#define EK_USE_PICOLIBC (0)
+
+/* 自动协调：使用 picolibc 时关闭 lwprintf */
+#if EK_USE_PICOLIBC == 1
+#    define EK_IO_NO_LWPRTF (1)
+#endif
+
+/* ========================================================================
  * 模块功能开关
  * - EK_EXPORT_ENABLE: 使能自动初始化
  * - EK_ASSERT_ENABLE: 断言

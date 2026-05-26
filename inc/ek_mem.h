@@ -26,23 +26,11 @@ extern "C"
 #endif
 
 /**
- * @brief  底层内存分配函数（弱定义）
- * @note   默认使用 TLSF 实现，如果不使用 TLSF（EK_HEAP_NO_TLSF=1），
- *         需要用户自行实现这三个函数的强定义版本
- * @warning 这些函数采用弱定义方式，用户可以覆盖默认实现
- */
-void *_ek_malloc(size_t size);
-void _ek_free(void *ptr);
-void *_ek_realloc(void *ptr, size_t size);
-
-/**
  * @brief  从默认内存堆分配内存
  * @param  size: 要分配的内存大小（字节）
  * @retval 分配的内存指针，失败返回 NULL
  */
-#ifndef ek_malloc
-#    define ek_malloc(size) _ek_malloc((size))
-#endif
+void *ek_malloc(size_t size);
 
 /**
  * @brief  重新分配内存大小
@@ -50,9 +38,7 @@ void *_ek_realloc(void *ptr, size_t size);
  * @param  size: 新的内存大小（字节）
  * @retval 重新分配后的内存指针，失败返回 NULL
  */
-#ifndef ek_realloc
-#    define ek_realloc(ptr, size) _ek_realloc((ptr), (size))
-#endif
+void *ek_realloc(void *ptr, size_t size);
 
 /**
  * @brief  释放内存到默认内存堆
@@ -67,6 +53,12 @@ void *_ek_realloc(void *ptr, size_t size);
             ptr = NULL;      \
         } while (0)
 #endif
+
+/**
+ * @brief  底层释放函数（弱定义）
+ * @note   被 ek_free 宏调用，用户可通过强定义覆盖
+ */
+void _ek_free(void *ptr);
 
 #if EK_HEAP_NO_TLSF == 0
 
@@ -137,7 +129,7 @@ size_t ek_heap_used(void);
 /* ========================================================================
  * EK_HEAP_NO_TLSF == 1: 用户自定义内存分配器
  * 用户需要:
- *   定义 _ek_malloc, _ek_free, _ek_realloc 函数
+ *   定义 ek_malloc, _ek_free, ek_realloc 函数的强版本
  * ======================================================================== */
 
 /**
