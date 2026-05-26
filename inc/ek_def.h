@@ -20,6 +20,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <inttypes.h>
 
 /**
  * @brief 换行符定义
