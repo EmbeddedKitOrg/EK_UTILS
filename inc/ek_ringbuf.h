@@ -11,7 +11,7 @@
 
 #include "ek_conf.h"
 
-#if (EK_RINGBUF_ENABLE == 1) || (EK_RINGBUF_SPSC_ENABLE == 1)
+#if (EKCFG_RINGBUF == 1) || (EKCFG_RINGBUF_SPSC == 1)
 
 #    include "ek_err.h"
 
@@ -21,7 +21,7 @@
 typedef struct ek_ringbuf_t ek_ringbuf_t;
 typedef struct ek_ringbuf_spsc_t ek_ringbuf_spsc_t;
 
-#    if EK_RINGBUF_ENABLE == 1
+#    if EKCFG_RINGBUF == 1
 struct ek_ringbuf_t
 {
     uint8_t *buffer; /**< 缓冲区指针 */
@@ -30,13 +30,13 @@ struct ek_ringbuf_t
     uint32_t item_amount; /**< 当前元素个数 */
     size_t cap; /**< 缓冲区容量（元素个数） */
     size_t item_size; /**< 单个元素大小（字节） */
-#        if EK_USE_RTOS == 1
+#        if EKCFG_RTOS == 1
     bool lock;
-#        endif /* EK_USE_RTOS */
+#        endif /* EKCFG_RTOS */
 };
-#    endif /* EK_RINGBUF_ENABLE */
+#    endif /* EKCFG_RINGBUF */
 
-#    if EK_RINGBUF_SPSC_ENABLE == 1
+#    if EKCFG_RINGBUF_SPSC == 1
 struct ek_ringbuf_spsc_t
 {
     uint8_t *buffer; /**< 缓冲区指针 */
@@ -45,14 +45,14 @@ struct ek_ringbuf_spsc_t
     size_t cap; /**< 底层槽位数量，实际最大可存元素数为 cap - 1 */
     size_t item_size; /**< 单个元素大小（字节） */
 };
-#    endif /* EK_RINGBUF_SPSC_ENABLE */
+#    endif /* EKCFG_RINGBUF_SPSC */
 
 #    ifdef __cplusplus
 extern "C"
 {
 #    endif /* __cplusplus */
 
-#    if EK_RINGBUF_ENABLE == 1
+#    if EKCFG_RINGBUF == 1
 /**
  * @brief 判断环形缓冲区是否已满
  * @param rb 环形缓冲区指针
@@ -126,9 +126,9 @@ ek_err_t ek_ringbuf_read(ek_ringbuf_t *rb, void *item);
  * @return EK_ERR_BUSY 资源忙（RTOS 模式）
  */
 ek_err_t ek_ringbuf_peek(ek_ringbuf_t *rb, void *item);
-#    endif /* EK_RINGBUF_ENABLE */
+#    endif /* EKCFG_RINGBUF */
 
-#    if EK_RINGBUF_SPSC_ENABLE == 1
+#    if EKCFG_RINGBUF_SPSC == 1
 /**
  * @brief 判断 SPSC 环形缓冲区是否已满
  * @param rb 环形缓冲区指针
@@ -196,12 +196,12 @@ ek_err_t ek_ringbuf_read_spsc(ek_ringbuf_spsc_t *rb, void *item);
  * @return EK_ERR_EMPTY 缓冲区为空
  */
 ek_err_t ek_ringbuf_peek_spsc(ek_ringbuf_spsc_t *rb, void *item);
-#    endif /* EK_RINGBUF_SPSC_ENABLE */
+#    endif /* EKCFG_RINGBUF_SPSC */
 
 #    ifdef __cplusplus
 }
 #    endif /* __cplusplus */
 
-#endif /* EK_RINGBUF_ENABLE || EK_RINGBUF_SPSC_ENABLE */
+#endif /* EKCFG_RINGBUF || EKCFG_RINGBUF_SPSC */
 
 #endif /* EK_RINGBUF_H */

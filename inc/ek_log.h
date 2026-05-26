@@ -17,7 +17,7 @@
 
 #include "ek_conf.h"
 
-#if EK_LOG_ENABLE == 1
+#if EKCFG_LOG == 1
 
 #    include "ek_io.h"
 #    include "ek_def.h"
@@ -26,25 +26,25 @@
  * @brief 是否启用彩色打印
  * @note 1 = 启用 ANSI 颜色代码，0 = 纯文本输出
  */
-#    ifndef EK_LOG_COLOR_ENABLE
-#        define EK_LOG_COLOR_ENABLE (0)
-#    endif /* EK_LOG_COLOR_ENABLE   */
+#    ifndef EKCFG_LOG_COLOR
+#        define EKCFG_LOG_COLOR (0)
+#    endif /* EKCFG_LOG_COLOR   */
 
 /**
  * @brief 是否启用 DEBUG 级别日志
  * @note 1 = 启用，0 = 禁用（可减小代码体积）
  */
-#    ifndef EK_LOG_DEBUG_ENABLE
-#        define EK_LOG_DEBUG_ENABLE (1)
-#    endif /* EK_LOG_DEBUG_ENABLE   */
+#    ifndef EKCFG_LOG_DEBUG
+#        define EKCFG_LOG_DEBUG (1)
+#    endif /* EKCFG_LOG_DEBUG   */
 
 /**
  * @brief 日志缓冲区大小
  * @note 单条日志的最大长度（字节）
  */
-#    ifndef EK_LOG_BUFFER_SIZE
-#        define EK_LOG_BUFFER_SIZE (256)
-#    endif /* EK_LOG_BUFFER_SIZE     */
+#    ifndef EKCFG_LOG_BUF_SIZE
+#        define EKCFG_LOG_BUF_SIZE (256)
+#    endif /* EKCFG_LOG_BUF_SIZE     */
 
 /**
  * @brief 定义文件标签
@@ -105,9 +105,9 @@ uint32_t _ek_log_get_tick(void);
 /**
  * @brief DEBUG 级别日志
  * @param ... 格式化字符串和参数
- * @note 仅在 EK_LOG_DEBUG_ENABLE == 1 时有效
+ * @note 仅在 EKCFG_LOG_DEBUG == 1 时有效
  */
-#    if (EK_LOG_DEBUG_ENABLE == 1)
+#    if (EKCFG_LOG_DEBUG == 1)
 #        define EK_LOG_DEBUG(...) \
             _ek_log_printf(_EK_LOG_TAG_, __LINE__, EK_LOG_TYPE_DEBUG, _ek_log_get_tick(), __VA_ARGS__)
 #    else
@@ -142,6 +142,6 @@ uint32_t _ek_log_get_tick(void);
 }
 #    endif
 
-#endif /* EK_LOG_ENABLE */
+#endif /* EKCFG_LOG */
 
 #endif // __SER_LOG_H

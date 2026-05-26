@@ -6,13 +6,13 @@
 
 #include "ek_stack.h"
 
-#if EK_STACK_ENABLE == 1
+#if EKCFG_STACK == 1
 
 #    include "../inc/ek_err.h"
 #    include "../inc/ek_assert.h"
 #    include "../inc/ek_mem.h"
 
-#    if EK_USE_RTOS == 1
+#    if EKCFG_RTOS == 1
 #        define EK_LOCKUP(psk)    ((psk)->lock = true)
 #        define EK_UNLOCK(psk)    ((psk)->lock = false)
 #        define EK_LOCK_TEST(psk) ((psk)->lock == true)
@@ -20,7 +20,7 @@
 #        define EK_LOCKUP(psk)
 #        define EK_UNLOCK(psk)
 #        define EK_LOCK_TEST(psk) (false)
-#    endif /* EK_USE_RTOS */
+#    endif /* EKCFG_RTOS */
 
 bool ek_stack_full(ek_stack_t *sk)
 {
@@ -54,9 +54,9 @@ ek_stack_t *ek_stack_create(size_t item_size, uint32_t item_amount)
     sk->sp = 0;
     sk->cap = item_amount;
     sk->item_size = item_size;
-#    if EK_USE_RTOS == 1
+#    if EKCFG_RTOS == 1
     sk->lock = false;
-#    endif /* EK_USE_RTOS */
+#    endif /* EKCFG_RTOS */
 
     return sk;
 }
@@ -117,4 +117,4 @@ ek_err_t ek_stack_pop(ek_stack_t *sk, void *item)
     return EK_ERR_NONE;
 }
 
-#endif /* EK_STACK_ENABLE */
+#endif /* EKCFG_STACK */

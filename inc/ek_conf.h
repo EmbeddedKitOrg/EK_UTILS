@@ -1,85 +1,68 @@
 /**
  * @file ek_conf.h
  * @brief EmbeddedKit 全局配置文件
+ * @author N1netyNine99
  *
  * 此文件定义了整个 EmbeddedKit 框架的全局配置宏。
- * 所有层级（L1~L5）都可以访问此文件中的配置。
+ * 所有配置宏统一使用 EKCFG_ 前缀，正逻辑命名（1=启用，0=禁用）。
+ * 本文件是唯一的配置来源，各模块不应自行定义默认值。
  */
+
 #ifndef EK_CONF_H
 #define EK_CONF_H
 
 /* ========================================================================
- * RTOS配置
- * - EK_USE_RTOS: 设置为0表示不用RTOS
+ * Section 1: 平台/运行环境
  * ======================================================================== */
-#define EK_USE_RTOS (0)
+
+#define EKCFG_RTOS      (0) /**< 是否使用 RTOS (0=裸机) */
+#define EKCFG_PICOLIBC  (0) /**< 是否使用 picolibc 替代标准 libc */
+#define EKCFG_IO_LWPRTF (1) /**< IO 是否使用 lwprintf (1=使用, 0=不使用) */
 
 /* ========================================================================
- * 内存管理配置 (ek_mem)
- * - EK_HEAP_NO_TLSF: 设置为1表示不使用TLSF内存池，需自定义实现具体API查看 ek_mem.h
- * - EK_HEAP_SIZE: heap的默认大小（字节）
+ * Section 2: 核心服务开关
  * ======================================================================== */
-#define EK_HEAP_NO_TLSF (0)
-#define EK_HEAP_SIZE    (30 * 1024)
+
+#define EKCFG_EXPORT (0) /**< 自动初始化机制 */
+#define EKCFG_ASSERT (1) /**< 断言模块 */
+#define EKCFG_LOG    (1) /**< 日志模块 */
 
 /* ========================================================================
- * IO库配置
- * -EK_IO_NO_LWPRTF : IO库不使用lwprintf
+ * Section 3: 数据结构开关
  * ======================================================================== */
-#define EK_IO_NO_LWPRTF (0)
+
+#define EKCFG_STR          (1) /**< 动态字符串 */
+#define EKCFG_LIST         (1) /**< 双向循环链表 */
+#define EKCFG_VEC          (1) /**< 动态数组 */
+#define EKCFG_RINGBUF      (1) /**< 通用环形缓冲区 */
+#define EKCFG_RINGBUF_SPSC (1) /**< SPSC 无锁环形缓冲区 */
+#define EKCFG_STACK        (1) /**< 通用栈 */
+#define EKCFG_EVOKE        (1) /**< 事件驱动调度器 */
 
 /* ========================================================================
- * picolibc 配置
- * - EK_USE_PICOLIBC: 设置为1表示使用 picolibc 替代标准 libc
+ * Section 4: 模块子配置
  * ======================================================================== */
-#define EK_USE_PICOLIBC (0)
 
-/* 自动协调：使用 picolibc 时关闭 lwprintf */
-#if EK_USE_PICOLIBC == 1
-#    define EK_IO_NO_LWPRTF (1)
+#define EKCFG_HEAP_TLSF    (1) /**< 内存堆使用 TLSF 分配器 (1=TLSF, 0=自定义) */
+#define EKCFG_HEAP_SIZE    (30 * 1024) /**< 内存堆大小（字节） */
+
+#define EKCFG_LOG_DEBUG    (1) /**< 启用 DEBUG 级别日志 */
+#define EKCFG_LOG_COLOR    (1) /**< 启用 ANSI 彩色日志 */
+#define EKCFG_LOG_BUF_SIZE (256) /**< 日志缓冲区大小（字节） */
+
+#define EKCFG_ASSERT_TINY  (1) /**< 使用轻量级断言模式 */
+#define EKCFG_ASSERT_LOG   (1) /**< 断言失败时输出日志 */
+
+/* ========================================================================
+ * Section 5: 配置依赖校验
+ * ======================================================================== */
+
+#if EKCFG_PICOLIBC == 1
+#    define EKCFG_IO_LWPRTF (0) /* picolibc 接管 printf，关闭 lwprintf */
 #endif
 
-/* ========================================================================
- * 模块功能开关
- * - EK_EXPORT_ENABLE: 使能自动初始化
- * - EK_ASSERT_ENABLE: 断言
- * - EK_STR_ENABLE: 使能字符串处理模块
- * - EK_LOG_ENABLE: 使能日志模块
- * - EK_LIST_ENABLE: 使能链表模块
- * - EK_VEC_ENABLE: 使能向量模块
- * - EK_RINGBUF_ENABLE: 使能通用环形缓冲区模块
- * - EK_RINGBUF_SPSC_ENABLE: 使能单生产者单消费者环形缓冲区模块
- * - EK_STACK_ENABLE: 使能栈模块
- * - EK_EVOKE_ENABLE: 使能事件驱动模块
- * ======================================================================== */
-#define EK_EXPORT_ENABLE       (0)
-#define EK_ASSERT_ENABLE       (1)
-#define EK_STR_ENABLE          (1)
-#define EK_LOG_ENABLE          (1)
-#define EK_LIST_ENABLE         (1)
-#define EK_VEC_ENABLE          (1)
-#define EK_RINGBUF_ENABLE      (1)
-#define EK_RINGBUF_SPSC_ENABLE (1)
-#define EK_STACK_ENABLE        (1)
-#define EK_EVOKE_ENABLE        (1)
+#if EKCFG_EVOKE == 1 && EKCFG_RTOS == 1
+#    error "EKCFG_EVOKE requires EKCFG_RTOS == 0 (bare-metal only)"
+#endif
 
-/* ========================================================================
- * 日志模块配置
- * - EK_LOG_DEBUG_ENABLE: 打开调试模式
- * - EK_LOG_COLOR_ENABLE: 启用彩色日志
- * - EK_LOG_BUFFER_SIZE: 日志字符默认缓冲区大小（字节）
- * ======================================================================== */
-#define EK_LOG_DEBUG_ENABLE (1)
-#define EK_LOG_COLOR_ENABLE (1)
-#define EK_LOG_BUFFER_SIZE  (256)
-
-/* ========================================================================
- * 断言模块
- * - EK_ASSERT_USE_TINY: 使用最小的断言模式
- * - EK_ASSERT_WITH_LOG: 使用断言日志，确保使用断言的文件
-                         都已经用 `EK_LOG_FILE_TAG` 打上标签
- * ======================================================================== */
-#define EK_ASSERT_USE_TINY (1)
-#define EK_ASSERT_WITH_LOG (1)
-
-#endif // EK_CONF_H
+#endif /* EK_CONF_H */

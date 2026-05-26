@@ -15,7 +15,7 @@
 
 #include "ek_conf.h"
 
-#if EK_VEC_ENABLE == 1
+#if EKCFG_VEC == 1
 
 #    include "ek_def.h"
 #    include "ek_mem.h"
@@ -96,12 +96,12 @@
  * @note 销毁后动态数组变量仍存在，但内容已清空
  * @note 如需重新使用，应重新调用 ek_vec_init
  */
-#    define ek_vec_destroy(v)   \
-        do                      \
-        {                       \
+#    define ek_vec_destroy(v)          \
+        do                             \
+        {                              \
             ek_free_safely((v).items); \
-            (v).amount = 0;     \
-            (v).cap = 0;        \
+            (v).amount = 0;            \
+            (v).cap = 0;               \
         } while (0)
 
 /**
@@ -204,11 +204,11 @@
             }                                                                                        \
             else if ((v).items)                                                                      \
             {                                                                                        \
-                ek_free_safely((v).items);                                                                  \
+                ek_free_safely((v).items);                                                           \
                 (v).cap = 0;                                                                         \
             }                                                                                        \
         } while (0)
 
-#endif /* EK_VEC_ENABLE */
+#endif /* EKCFG_VEC */
 
 #endif /* EK_VEC_H */

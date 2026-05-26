@@ -18,7 +18,7 @@
 
 #include "ek_conf.h"
 
-#if EK_STACK_ENABLE == 1
+#if EKCFG_STACK == 1
 
 #    include "ek_err.h"
 
@@ -35,9 +35,9 @@ struct ek_stack_t
     uint32_t sp; /**< 栈顶指针（stack pointer），指向下一个写入位置 */
     size_t item_size; /**< 单个元素的大小（字节） */
     uint32_t cap; /**< 栈的最大容量 */
-#    if EK_USE_RTOS == 1
+#    if EKCFG_RTOS == 1
     bool lock;
-#    endif /* EK_USE_RTOS */
+#    endif /* EKCFG_RTOS */
 };
 
 #    ifdef __cplusplus
@@ -144,6 +144,6 @@ ek_err_t ek_stack_pop(ek_stack_t *sk, void *item);
 }
 #    endif /* __cplusplus */
 
-#endif /* EK_STACK_ENABLE */
+#endif /* EKCFG_STACK */
 
 #endif /* EK_STACK_H */

@@ -18,7 +18,7 @@ extern "C"
 {
 #endif
 
-#if EK_IO_NO_LWPRTF == 0
+#if EKCFG_IO_LWPRTF == 1
 
 #    include "../../third_party/lwprintf/inc/lwprintf.h"
 
@@ -46,7 +46,7 @@ void ek_io_init(void);
 #    define ek_snprintf  lwsnprintf
 #    define ek_vsnprintf lwvsnprintf
 
-#elif EK_USE_PICOLIBC == 1
+#elif EKCFG_PICOLIBC == 1
 
 /**
  * @brief 定义字符输出函数（picolibc 模式）
@@ -78,7 +78,7 @@ void ek_io_init(void);
 #    define ek_snprintf
 #    define ek_vsnprintf
 
-#endif /* EK_IO_NO_LWPRTF */
+#endif /* EKCFG_IO_LWPRTF */
 
 #ifdef __cplusplus
 }

@@ -6,7 +6,7 @@
 
 #include "ek_mem.h"
 
-#if EK_HEAP_NO_TLSF == 0
+#if EKCFG_HEAP_TLSF == 1
 
 /*
  * @note 内存管理都来自于 tlsf(../third_party/tlsf/tlsf.c),对于不同大小的内存需求管理，
@@ -60,7 +60,7 @@
  * ==================================================================================
  */
 
-uint8_t ek_default_heap[EK_HEAP_SIZE];
+uint8_t ek_default_heap[EKCFG_HEAP_SIZE];
 tlsf_t ek_default_tlsf;
 
 static size_t ek_unused_bytes = 0;
@@ -113,4 +113,4 @@ size_t ek_heap_used(void)
     return ek_used_bytes;
 }
 
-#endif /* EK_HEAP_NO_TLSF */
+#endif /* EKCFG_HEAP_TLSF */

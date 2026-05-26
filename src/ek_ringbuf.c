@@ -6,14 +6,14 @@
 
 #include "ek_ringbuf.h"
 
-#if (EK_RINGBUF_ENABLE == 1) || (EK_RINGBUF_SPSC_ENABLE == 1)
+#if (EKCFG_RINGBUF == 1) || (EKCFG_RINGBUF_SPSC == 1)
 
 #    include "ek_mem.h"
 #    include "ek_assert.h"
 #    include "ek_err.h"
 
-#    if EK_RINGBUF_ENABLE == 1
-#        if EK_USE_RTOS == 1
+#    if EKCFG_RINGBUF == 1
+#        if EKCFG_RTOS == 1
 #            define EK_LOCKUP(prb)    ((prb)->lock = true)
 #            define EK_UNLOCK(prb)    ((prb)->lock = false)
 #            define EK_LOCK_TEST(prb) ((prb)->lock == true)
@@ -21,7 +21,7 @@
 #            define EK_LOCKUP(prb)
 #            define EK_UNLOCK(prb)
 #            define EK_LOCK_TEST(prb) (false)
-#        endif /* EK_USE_RTOS */
+#        endif /* EKCFG_RTOS */
 
 bool ek_ringbuf_full(const ek_ringbuf_t *rb)
 {
@@ -57,9 +57,9 @@ ek_ringbuf_t *ek_ringbuf_create(size_t item_size, uint32_t item_amount)
     rb->read_idx = 0;
     rb->write_idx = 0;
     rb->item_amount = 0;
-#        if EK_USE_RTOS == 1
+#        if EKCFG_RTOS == 1
     rb->lock = false;
-#        endif /* EK_USE_RTOS */
+#        endif /* EKCFG_RTOS */
 
     return rb;
 }
@@ -148,9 +148,9 @@ ek_err_t ek_ringbuf_peek(ek_ringbuf_t *rb, void *item)
 
     return EK_ERR_NONE;
 }
-#    endif /* EK_RINGBUF_ENABLE */
+#    endif /* EKCFG_RINGBUF */
 
-#    if EK_RINGBUF_SPSC_ENABLE == 1
+#    if EKCFG_RINGBUF_SPSC == 1
 __EK_STATIC_INLINE uint32_t _ek_ringbuf_spsc_next_idx(const ek_ringbuf_spsc_t *rb, uint32_t idx)
 {
     return (idx + 1U) % rb->cap;
@@ -255,6 +255,6 @@ ek_err_t ek_ringbuf_peek_spsc(ek_ringbuf_spsc_t *rb, void *item)
 
     return EK_ERR_NONE;
 }
-#    endif /* EK_RINGBUF_SPSC_ENABLE */
+#    endif /* EKCFG_RINGBUF_SPSC */
 
-#endif /* EK_RINGBUF_ENABLE || EK_RINGBUF_SPSC_ENABLE */
+#endif /* EKCFG_RINGBUF || EKCFG_RINGBUF_SPSC */

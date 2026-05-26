@@ -6,7 +6,7 @@
  * 提供轻量级的事件驱动机制，用于非 RTOS 环境下的任务调度和事件处理
  * 支持任务等待事件、延迟发布、ISR 请求队列等功能
  *
- * @note 仅在 EK_USE_RTOS == 0 时可用
+ * @note 仅在 EKCFG_RTOS == 0 时可用
  * @note 需要用户实现睡眠和定时器回调的弱函数
  */
 
@@ -15,7 +15,7 @@
 
 #include "ek_conf.h"
 
-#if EK_USE_RTOS == 0 && EK_EVOKE_ENABLE == 1
+#if EKCFG_RTOS == 0 && EKCFG_EVOKE == 1
 
 #    include "ek_def.h"
 #    include "ek_list.h"
@@ -280,6 +280,6 @@ void ek_evoke_light_sleep(void);
  */
 void ek_evoke_deep_sleep(void);
 
-#endif // EK_USE_RTOS == 0 && EK_EVOKE_ENABLE == 1
+#endif // EKCFG_RTOS == 0 && EKCFG_EVOKE == 1
 
 #endif // EK_EVOKE_H

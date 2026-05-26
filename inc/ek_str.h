@@ -17,7 +17,7 @@
 
 #include "ek_conf.h"
 
-#if EK_STR_ENABLE == 1
+#if EKCFG_STR == 1
 
 #    include "ek_err.h"
 
@@ -160,6 +160,6 @@ int ek_str_ncmp(ek_str_t *s1, ek_str_t *s2, size_t n);
 }
 #    endif
 
-#endif // EK_STR_ENABLE
+#endif // EKCFG_STR
 
 #endif // EK_STR_H

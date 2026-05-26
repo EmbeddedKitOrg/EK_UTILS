@@ -12,14 +12,6 @@
 #include "ek_def.h"
 #include "ek_conf.h"
 
-#ifndef EK_HEAP_NO_TLSF
-#    define EK_HEAP_NO_TLSF 0 /* 默认使用 TLSF 内存分配器 */
-#endif
-
-#ifndef EK_HEAP_SIZE
-#    define EK_HEAP_SIZE (10 * 1024)
-#endif
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -59,7 +51,7 @@ void ek_free(void *ptr);
         } while (0)
 #endif
 
-#if EK_HEAP_NO_TLSF == 0
+#if EKCFG_HEAP_TLSF == 1
 
 #    include "../../third_party/tlsf/tlsf.h"
 
@@ -71,11 +63,11 @@ extern tlsf_t ek_default_tlsf;
  * @note   使用 TLSF 内存分配器创建默认内存池
  */
 #    ifndef ek_heap_init
-#        define ek_heap_init()                                                          \
-            do                                                                          \
-            {                                                                           \
-                ek_default_tlsf = tlsf_create_with_pool(ek_default_heap, EK_HEAP_SIZE); \
-                while (ek_default_tlsf == NULL);                                        \
+#        define ek_heap_init()                                                             \
+            do                                                                             \
+            {                                                                              \
+                ek_default_tlsf = tlsf_create_with_pool(ek_default_heap, EKCFG_HEAP_SIZE); \
+                while (ek_default_tlsf == NULL);                                           \
             } while (0)
 #    endif
 
@@ -84,7 +76,7 @@ extern tlsf_t ek_default_tlsf;
  * @retval 内存池总字节数
  */
 #    ifndef ek_heap_total_size
-#        define ek_heap_total_size() (EK_HEAP_SIZE - tlsf_size())
+#        define ek_heap_total_size() (EKCFG_HEAP_SIZE - tlsf_size())
 #    endif
 
 /**
@@ -126,7 +118,7 @@ size_t ek_heap_used(void);
 #else
 
 /* ========================================================================
- * EK_HEAP_NO_TLSF == 1: 用户自定义内存分配器
+ * EKCFG_HEAP_TLSF == 0: 用户自定义内存分配器
  * 用户需要:
  *   定义 ek_malloc, ek_free, ek_realloc 函数的强版本
  * ======================================================================== */
@@ -138,7 +130,7 @@ size_t ek_heap_used(void);
 #        define ek_heap_init() ((void)0)
 #    endif
 
-#endif /* EK_HEAP_NO_TLSF */
+#endif /* EKCFG_HEAP_TLSF */
 
 #ifdef __cplusplus
 }

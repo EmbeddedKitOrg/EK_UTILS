@@ -6,7 +6,7 @@
 
 #include "ek_io.h"
 
-#if EK_IO_NO_LWPRTF == 0
+#if EKCFG_IO_LWPRTF == 1
 
 #    include "../inc/ek_def.h"
 
@@ -30,7 +30,7 @@ void ek_io_init(void)
     lwprintf_init(_ek_io_printf);
 }
 
-#elif EK_USE_PICOLIBC == 1
+#elif EKCFG_PICOLIBC == 1
 
 #    include "../inc/ek_def.h"
 

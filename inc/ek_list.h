@@ -11,7 +11,7 @@
 
 #include "ek_conf.h"
 
-#if EK_LIST_ENABLE == 1
+#if EKCFG_LIST == 1
 
 #    include "ek_def.h"
 
@@ -200,6 +200,6 @@ __EK_STATIC_INLINE ek_list_node_t *ek_list_get_last(ek_list_node_t *head)
     return head->prev;
 }
 
-#endif /* EK_LIST_ENABLE */
+#endif /* EKCFG_LIST */
 
 #endif /* EK_LIST_H */

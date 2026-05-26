@@ -6,7 +6,7 @@
 
 #include "ek_export.h"
 
-#if (EK_EXPORT_ENABLE == 1)
+#if (EKCFG_EXPORT == 1)
 
 #    include "../inc/ek_assert.h"
 
@@ -31,4 +31,4 @@ void ek_export_init(void)
 {
 }
 
-#endif /* EK_EXPORT_ENABLE */
+#endif /* EKCFG_EXPORT */

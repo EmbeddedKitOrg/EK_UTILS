@@ -6,7 +6,7 @@
 
 #include "ek_str.h"
 
-#if EK_STR_ENABLE == 1
+#if EKCFG_STR == 1
 
 #    include "../inc/ek_io.h"
 #    include "../inc/ek_mem.h"
@@ -238,4 +238,4 @@ static ek_err_t _ek_str_ensure_cap(ek_str_t *s, uint32_t len)
     return EK_ERR_NONE;
 }
 
-#endif // EK_STR_ENABLE
+#endif // EKCFG_STR

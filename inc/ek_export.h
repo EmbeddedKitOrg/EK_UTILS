@@ -23,7 +23,7 @@
 
 #include "ek_conf.h"
 
-#if (EK_EXPORT_ENABLE == 1)
+#if (EKCFG_EXPORT == 1)
 
 /**
  * @brief 导出初始化函数类型
@@ -73,7 +73,7 @@ typedef void (*_ek_export_init_fn_t)(void);
 #    define EK_EXPORT_APP(fn)
 #    define EK_EXPORT_USER(fn)
 
-#endif /* EK_EXPORT_ENABLE */
+#endif /* EKCFG_EXPORT */
 
 #ifdef __cplusplus
 extern "C"
