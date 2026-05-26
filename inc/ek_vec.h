@@ -99,7 +99,7 @@
 #    define ek_vec_destroy(v)   \
         do                      \
         {                       \
-            ek_free((v).items); \
+            ek_free_safely((v).items); \
             (v).amount = 0;     \
             (v).cap = 0;        \
         } while (0)
@@ -204,8 +204,7 @@
             }                                                                                        \
             else if ((v).items)                                                                      \
             {                                                                                        \
-                ek_free((v).items);                                                                  \
-                (v).items = NULL;                                                                    \
+                ek_free_safely((v).items);                                                                  \
                 (v).cap = 0;                                                                         \
             }                                                                                        \
         } while (0)

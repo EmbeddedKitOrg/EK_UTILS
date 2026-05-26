@@ -4,8 +4,8 @@
  * @author N1netyNine99
  *
  * 统一 picolibc 与 ek_utils 的内存分配器和字符输出：
- * - 场景 A (EK_HEAP_NO_TLSF=0): picolibc 的 malloc/free/realloc → ek_malloc/_ek_free/ek_realloc (TLSF)
- * - 场景 B (EK_HEAP_NO_TLSF=1): ek_malloc/_ek_free/ek_realloc → picolibc 的 malloc/free/realloc
+ * - 场景 A (EK_HEAP_NO_TLSF=0): picolibc 的 malloc/free/realloc → ek_malloc/ek_free/ek_realloc (TLSF)
+ * - 场景 B (EK_HEAP_NO_TLSF=1): ek_malloc/ek_free/ek_realloc → picolibc 的 malloc/free/realloc
  * - stdout: putchar → _ek_io_fputc
  */
 
@@ -26,7 +26,7 @@ void *malloc(size_t size)
 
 void free(void *ptr)
 {
-    _ek_free(ptr);
+    ek_free(ptr);
 }
 
 void *realloc(void *ptr, size_t size)
@@ -43,7 +43,7 @@ void *ek_malloc(size_t size)
     return malloc(size);
 }
 
-void _ek_free(void *ptr)
+void ek_free(void *ptr)
 {
     free(ptr);
 }

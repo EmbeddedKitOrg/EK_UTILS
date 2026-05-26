@@ -43,22 +43,21 @@ void *ek_realloc(void *ptr, size_t size);
 /**
  * @brief  释放内存到默认内存堆
  * @param  ptr: 要释放的内存指针
- * @note   释放后指针会被置为 NULL，避免悬空指针
  */
-#ifndef ek_free
-#    define ek_free(ptr)     \
-        do                   \
-        {                    \
-            _ek_free((ptr)); \
-            ptr = NULL;      \
-        } while (0)
-#endif
+void ek_free(void *ptr);
 
 /**
- * @brief  底层释放函数（弱定义）
- * @note   被 ek_free 宏调用，用户可通过强定义覆盖
+ * @brief  释放内存并将指针置为 NULL，避免悬空指针
+ * @param  ptr: 要释放的内存指针
  */
-void _ek_free(void *ptr);
+#ifndef ek_free_safely
+#    define ek_free_safely(ptr) \
+        do                      \
+        {                       \
+            ek_free((ptr));     \
+            ptr = NULL;         \
+        } while (0)
+#endif
 
 #if EK_HEAP_NO_TLSF == 0
 
@@ -129,7 +128,7 @@ size_t ek_heap_used(void);
 /* ========================================================================
  * EK_HEAP_NO_TLSF == 1: 用户自定义内存分配器
  * 用户需要:
- *   定义 ek_malloc, _ek_free, ek_realloc 函数的强版本
+ *   定义 ek_malloc, ek_free, ek_realloc 函数的强版本
  * ======================================================================== */
 
 /**

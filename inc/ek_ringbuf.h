@@ -81,7 +81,7 @@ ek_ringbuf_t *ek_ringbuf_create(size_t item_size, uint32_t item_amount);
  * @brief 销毁环形缓冲区
  * @param rb 要销毁的环形缓冲区
  *
- * @note ek_free 会自动将 rb->buffer 置为 NULL，但 rb 本身需要调用者手动置空
+ * @note ek_free_safely 会自动将 rb->buffer 置为 NULL，但 rb 本身需要调用者手动置空
  */
 void ek_ringbuf_destroy(ek_ringbuf_t *rb);
 

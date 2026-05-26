@@ -89,7 +89,7 @@ ek_stack_t *ek_stack_create(size_t item_size, uint32_t item_amount);
  *
  * @param sk 栈指针
  *
- * @note ek_free 会自动将 sk->buffer 置为 NULL，但 sk 本身需要调用者手动置空
+ * @note ek_free_safely 会自动将 sk->buffer 置为 NULL，但 sk 本身需要调用者手动置空
  * @warning 传入 NULL 指针将触发断言失败
  * @warning 不应对同一个栈多次调用此函数
  */

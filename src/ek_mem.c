@@ -76,7 +76,7 @@ __EK_WEAK void *ek_realloc(void *ptr, size_t size)
     return tlsf_realloc(ek_default_tlsf, ptr, size);
 }
 
-__EK_WEAK void _ek_free(void *ptr)
+__EK_WEAK void ek_free(void *ptr)
 {
     tlsf_free(ek_default_tlsf, ptr);
 }
