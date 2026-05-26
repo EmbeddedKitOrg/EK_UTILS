@@ -19,7 +19,7 @@
 
 #if EK_STR_ENABLE == 1
 
-#    include "ek_def.h"
+#    include "ek_err.h"
 
 #    ifdef __cplusplus
 extern "C"
@@ -64,35 +64,39 @@ void ek_str_clear(ek_str_t *s);
  * @param s 字符串对象指针
  * @param str 要追加的字符串
  * @param len 追加的长度
- * @return true 成功，false 失败（内存不足）
+ * @return EK_ERR_NONE 成功
+ * @return EK_ERR_NOMEM 内存不足
  */
-bool ek_str_append_len(ek_str_t *s, const char *str, uint32_t len);
+ek_err_t ek_str_append_len(ek_str_t *s, const char *str, uint32_t len);
 
 /**
  * @brief 追加字符串
  * @param s 字符串对象指针
  * @param str 要追加的字符串（以 \0 结尾）
- * @return true 成功，false 失败（内存不足）
+ * @return EK_ERR_NONE 成功
+ * @return EK_ERR_NOMEM 内存不足
  */
-bool ek_str_append(ek_str_t *s, const char *str);
+ek_err_t ek_str_append(ek_str_t *s, const char *str);
 
 /**
  * @brief 追加格式化字符串
  * @param s 字符串对象指针
  * @param fmt 格式化字符串
  * @param ... 可变参数
- * @return true 成功，false 失败（内存不足）
+ * @return EK_ERR_NONE 成功
+ * @return EK_ERR_NOMEM 内存不足
  */
-bool ek_str_append_fmt(ek_str_t *s, const char *fmt, ...);
+ek_err_t ek_str_append_fmt(ek_str_t *s, const char *fmt, ...);
 
 /**
  * @brief 拼接两个字符串
  * @param dst 目标字符串
  * @param src 源字符串
- * @return true 成功，false 失败（内存不足）
+ * @return EK_ERR_NONE 成功
+ * @return EK_ERR_NOMEM 内存不足
  * @note 将 src 的内容追加到 dst 末尾
  */
-bool ek_str_cat(ek_str_t *dst, ek_str_t *src);
+ek_err_t ek_str_cat(ek_str_t *dst, ek_str_t *src);
 
 /**
  * @brief 字符串切片
@@ -107,10 +111,11 @@ ek_str_t *ek_str_slice(const ek_str_t *s, int32_t start, int32_t end);
 /**
  * @brief 翻转字符串
  * @param s 源字符串
- * @return 是否执行成功
- * @note 如果字符串的缓冲区为空会直接返回 false
+ * @return EK_ERR_NONE 成功
+ * @return EK_ERR_INVAL 缓冲区为空
+ * @note 如果字符串的缓冲区为空会直接返回 EK_ERR_INVAL
  */
-bool ek_str_reverse(ek_str_t *s);
+ek_err_t ek_str_reverse(ek_str_t *s);
 
 /**
  * @brief 获取 C 风格字符串

@@ -8,6 +8,7 @@
 
 #if EK_STACK_ENABLE == 1
 
+#    include "../inc/ek_err.h"
 #    include "../inc/ek_assert.h"
 #    include "../inc/ek_mem.h"
 
@@ -68,19 +69,19 @@ void ek_stack_destroy(ek_stack_t *sk)
     ek_free(sk);
 }
 
-bool ek_stack_push(ek_stack_t *sk, const void *item)
+ek_err_t ek_stack_push(ek_stack_t *sk, const void *item)
 {
     ek_assert_param(sk != NULL);
     ek_assert_param(item != NULL);
 
-    if (EK_LOCK_TEST(sk) == true) return false;
+    if (EK_LOCK_TEST(sk) == true) return EK_ERR_BUSY;
 
     EK_LOCKUP(sk);
 
     if (ek_stack_full(sk) == true)
     {
         EK_UNLOCK(sk);
-        return false;
+        return EK_ERR_FULL;
     }
 
     uint8_t *target = (uint8_t *)sk->buffer + sk->sp * sk->item_size;
@@ -89,22 +90,22 @@ bool ek_stack_push(ek_stack_t *sk, const void *item)
 
     EK_UNLOCK(sk);
 
-    return true;
+    return EK_ERR_NONE;
 }
 
-bool ek_stack_pop(ek_stack_t *sk, void *item)
+ek_err_t ek_stack_pop(ek_stack_t *sk, void *item)
 {
     ek_assert_param(sk != NULL);
     ek_assert_param(item != NULL);
 
-    if (EK_LOCK_TEST(sk) == true) return false;
+    if (EK_LOCK_TEST(sk) == true) return EK_ERR_BUSY;
 
     EK_LOCKUP(sk);
 
     if (ek_stack_empty(sk) == true)
     {
         EK_UNLOCK(sk);
-        return false;
+        return EK_ERR_EMPTY;
     }
 
     sk->sp--;
@@ -113,7 +114,7 @@ bool ek_stack_pop(ek_stack_t *sk, void *item)
 
     EK_UNLOCK(sk);
 
-    return true;
+    return EK_ERR_NONE;
 }
 
 #endif /* EK_STACK_ENABLE */

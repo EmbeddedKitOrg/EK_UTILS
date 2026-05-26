@@ -61,6 +61,24 @@ typedef uint8_t ek_err_t;
 #define EK_ERR_PARITY  ((ek_err_t)244) /**< 奇偶校验错误 */
 #define EK_ERR_NOISE   ((ek_err_t)245) /**< 线路噪声 */
 
+/* ========== 错误处理辅助宏 ========== */
+
+/** 如果表达式返回非 EK_ERR_NONE，直接 return 该错误码 */
+#define EK_RETURN_IF_ERR(expr)                  \
+    do                                          \
+    {                                           \
+        ek_err_t _err_ = (expr);                \
+        if (_err_ != EK_ERR_NONE) return _err_; \
+    } while (0)
+
+/** 如果表达式返回非 EK_ERR_NONE，goto 到指定标签（用于 cleanup 模式） */
+#define EK_GOTO_IF_ERR(expr, label)           \
+    do                                        \
+    {                                         \
+        ek_err_t _err_ = (expr);              \
+        if (_err_ != EK_ERR_NONE) goto label; \
+    } while (0)
+
 /**
  * @brief 将错误码转为可读字符串
  * @param err 错误码

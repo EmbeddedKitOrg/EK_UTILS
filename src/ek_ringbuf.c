@@ -10,6 +10,7 @@
 
 #    include "ek_mem.h"
 #    include "ek_assert.h"
+#    include "ek_err.h"
 
 #    if EK_RINGBUF_ENABLE == 1
 #        if EK_USE_RTOS == 1
@@ -71,19 +72,19 @@ void ek_ringbuf_destroy(ek_ringbuf_t *rb)
     ek_free(rb);
 }
 
-bool ek_ringbuf_write(ek_ringbuf_t *rb, const void *item)
+ek_err_t ek_ringbuf_write(ek_ringbuf_t *rb, const void *item)
 {
     ek_assert_param(item != NULL);
     ek_assert_param(rb != NULL);
 
-    if (EK_LOCK_TEST(rb) == true) return false;
+    if (EK_LOCK_TEST(rb) == true) return EK_ERR_BUSY;
 
     EK_LOCKUP(rb);
 
     if (ek_ringbuf_full(rb) == true)
     {
         EK_UNLOCK(rb);
-        return false;
+        return EK_ERR_FULL;
     }
 
     uint8_t *target = rb->buffer + (rb->write_idx * rb->item_size);
@@ -94,21 +95,21 @@ bool ek_ringbuf_write(ek_ringbuf_t *rb, const void *item)
 
     EK_UNLOCK(rb);
 
-    return true;
+    return EK_ERR_NONE;
 }
 
-bool ek_ringbuf_read(ek_ringbuf_t *rb, void *item)
+ek_err_t ek_ringbuf_read(ek_ringbuf_t *rb, void *item)
 {
     ek_assert_param(rb != NULL);
 
-    if (EK_LOCK_TEST(rb) == true) return false;
+    if (EK_LOCK_TEST(rb) == true) return EK_ERR_BUSY;
 
     EK_LOCKUP(rb);
 
     if (ek_ringbuf_empty(rb) == true)
     {
         EK_UNLOCK(rb);
-        return false;
+        return EK_ERR_EMPTY;
     }
 
     if (item != NULL)
@@ -122,22 +123,22 @@ bool ek_ringbuf_read(ek_ringbuf_t *rb, void *item)
 
     EK_UNLOCK(rb);
 
-    return true;
+    return EK_ERR_NONE;
 }
 
-bool ek_ringbuf_peek(ek_ringbuf_t *rb, void *item)
+ek_err_t ek_ringbuf_peek(ek_ringbuf_t *rb, void *item)
 {
     ek_assert_param(item != NULL);
     ek_assert_param(rb != NULL);
 
-    if (EK_LOCK_TEST(rb) == true) return false;
+    if (EK_LOCK_TEST(rb) == true) return EK_ERR_BUSY;
 
     EK_LOCKUP(rb);
 
     if (ek_ringbuf_empty(rb) == true)
     {
         EK_UNLOCK(rb);
-        return false;
+        return EK_ERR_EMPTY;
     }
 
     const uint8_t *source = rb->buffer + (rb->read_idx * rb->item_size);
@@ -145,7 +146,7 @@ bool ek_ringbuf_peek(ek_ringbuf_t *rb, void *item)
 
     EK_UNLOCK(rb);
 
-    return true;
+    return EK_ERR_NONE;
 }
 #    endif /* EK_RINGBUF_ENABLE */
 
@@ -201,7 +202,7 @@ void ek_ringbuf_destroy_spsc(ek_ringbuf_spsc_t *rb)
     ek_free(rb);
 }
 
-bool ek_ringbuf_write_spsc(ek_ringbuf_spsc_t *rb, const void *item)
+ek_err_t ek_ringbuf_write_spsc(ek_ringbuf_spsc_t *rb, const void *item)
 {
     ek_assert_param(rb != NULL);
     ek_assert_param(item != NULL);
@@ -209,23 +210,23 @@ bool ek_ringbuf_write_spsc(ek_ringbuf_spsc_t *rb, const void *item)
     uint32_t next_idx = _ek_ringbuf_spsc_next_idx(rb, rb->write_idx);
     if (next_idx == rb->read_idx)
     {
-        return false;
+        return EK_ERR_FULL;
     }
 
     uint8_t *target = rb->buffer + (rb->write_idx * rb->item_size);
     memcpy(target, item, rb->item_size);
     rb->write_idx = next_idx;
 
-    return true;
+    return EK_ERR_NONE;
 }
 
-bool ek_ringbuf_read_spsc(ek_ringbuf_spsc_t *rb, void *item)
+ek_err_t ek_ringbuf_read_spsc(ek_ringbuf_spsc_t *rb, void *item)
 {
     ek_assert_param(rb != NULL);
 
     if (rb->read_idx == rb->write_idx)
     {
-        return false;
+        return EK_ERR_EMPTY;
     }
 
     if (item != NULL)
@@ -236,23 +237,23 @@ bool ek_ringbuf_read_spsc(ek_ringbuf_spsc_t *rb, void *item)
 
     rb->read_idx = _ek_ringbuf_spsc_next_idx(rb, rb->read_idx);
 
-    return true;
+    return EK_ERR_NONE;
 }
 
-bool ek_ringbuf_peek_spsc(ek_ringbuf_spsc_t *rb, void *item)
+ek_err_t ek_ringbuf_peek_spsc(ek_ringbuf_spsc_t *rb, void *item)
 {
     ek_assert_param(rb != NULL);
     ek_assert_param(item != NULL);
 
     if (rb->read_idx == rb->write_idx)
     {
-        return false;
+        return EK_ERR_EMPTY;
     }
 
     const uint8_t *source = rb->buffer + (rb->read_idx * rb->item_size);
     memcpy(item, source, rb->item_size);
 
-    return true;
+    return EK_ERR_NONE;
 }
 #    endif /* EK_RINGBUF_SPSC_ENABLE */
 

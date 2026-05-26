@@ -20,7 +20,7 @@
 
 #if EK_STACK_ENABLE == 1
 
-#    include "ek_def.h"
+#    include "ek_err.h"
 
 /**
  * @brief 栈结构体
@@ -113,14 +113,15 @@ void ek_stack_destroy(ek_stack_t *sk);
  *
  * @param sk 栈指针
  * @param item 指向要压入的元素的指针
- * @return true 成功压入
- * @return false 栈已满，压入失败
+ * @return EK_ERR_NONE 成功压入
+ * @return EK_ERR_FULL 栈已满
+ * @return EK_ERR_BUSY 资源忙（RTOS 模式）
  *
  * @warning sk 和 item 不能为 NULL，否则触发断言
  * @note 复杂度：O(1)
  * @note 会按 item_size 字节数复制数据
  */
-bool ek_stack_push(ek_stack_t *sk, const void *item);
+ek_err_t ek_stack_push(ek_stack_t *sk, const void *item);
 
 /**
  * @brief 从栈顶弹出一个元素
@@ -129,14 +130,15 @@ bool ek_stack_push(ek_stack_t *sk, const void *item);
  *
  * @param sk 栈指针
  * @param item 指向接收弹出元素的缓冲区的指针
- * @return true 成功弹出
- * @return false 栈为空，弹出失败
+ * @return EK_ERR_NONE 成功弹出
+ * @return EK_ERR_EMPTY 栈为空
+ * @return EK_ERR_BUSY 资源忙（RTOS 模式）
  *
  * @warning sk 和 item 不能为 NULL，否则触发断言
  * @note 复杂度：O(1)
  * @note 会按 item_size 字节数复制数据
  */
-bool ek_stack_pop(ek_stack_t *sk, void *item);
+ek_err_t ek_stack_pop(ek_stack_t *sk, void *item);
 
 #    ifdef __cplusplus
 }
