@@ -52,8 +52,9 @@ void ek_io_init(void);
 
 /**
  * @brief 底层字符输出函数声明
+ * @return 返回字符串
  */
-void _ek_io_fputc(int ch);
+int _ek_io_fputc(int ch);
 
 /**
  * @brief 定义字符输出函数（picolibc 模式）
