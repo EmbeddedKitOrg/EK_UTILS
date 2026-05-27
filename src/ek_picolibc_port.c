@@ -4,8 +4,8 @@
  * @author N1netyNine99
  *
  * 统一 picolibc 与 ek_utils 的内存分配器和字符输出：
- * - 场景 A (EKCFG_HEAP_TLSF=1): picolibc 的 malloc/free/realloc → ek_malloc/ek_free/ek_realloc (TLSF)
- * - 场景 B (EKCFG_HEAP_TLSF=0): ek_malloc/ek_free/ek_realloc → picolibc 的 malloc/free/realloc
+ * - A (EKCFG_HEAP_TLSF=1): picolibc 的 malloc/free/realloc → ek_malloc/ek_free/ek_realloc (TLSF)
+ * - B (EKCFG_HEAP_TLSF=0): ek_malloc/ek_free/ek_realloc → picolibc 的 malloc/free/realloc
  * - stdout: putchar → _ek_io_fputc
  */
 
@@ -16,7 +16,6 @@
 #    include "ek_heap.h"
 #    include "ek_io.h"
 
-/* ========== 场景 A: TLSF 分配器，picolibc 调用走 TLSF ========== */
 #    if EKCFG_HEAP_TLSF == 1
 
 void *malloc(size_t size)
@@ -36,8 +35,6 @@ void *realloc(void *ptr, size_t size)
 
 #    else /* EKCFG_HEAP_TLSF == 0 */
 
-/* ========== 场景 B: picolibc 分配器，ek 调用走 picolibc ========== */
-
 void *ek_malloc(size_t size)
 {
     return malloc(size);
@@ -55,12 +52,23 @@ void *ek_realloc(void *ptr, size_t size)
 
 #    endif /* EKCFG_HEAP_TLSF */
 
-/* ========== stdout 输出对接 ========== */
-
-int putchar(int ch)
+static int _ek_picolibc_putc(char c, FILE *file)
 {
-    _ek_io_fputc(ch);
-    return ch;
+    __EK_UNUSED(file);
+    return _ek_io_fputc(c);
 }
+
+void _exit(int status)
+{
+    __EK_UNUSED(status);
+    while (1)
+    {
+    }
+}
+
+static FILE __stdio = FDEV_SETUP_STREAM(_ek_picolibc_putc, NULL, NULL, _FDEV_SETUP_WRITE);
+
+FILE *const stdout = &__stdio;
+FILE *const stderr = &__stdio;
 
 #endif /* EKCFG_PICOLIBC */
