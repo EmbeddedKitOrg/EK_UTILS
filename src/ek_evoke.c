@@ -257,7 +257,7 @@ void ek_evoke_event_defer(ek_evoke_event_handle_t evt, void *payload, uint32_t d
     ek_list_insert_before(pos, &req->node);
 }
 
-void ek_evoke_event_broadcast_from_isr(ek_evoke_event_handle_t evt, void *payload)
+ek_err_t ek_evoke_event_broadcast_from_isr(ek_evoke_event_handle_t evt, void *payload)
 {
     ek_assert_param(evt != NULL);
 
@@ -268,12 +268,16 @@ void ek_evoke_event_broadcast_from_isr(ek_evoke_event_handle_t evt, void *payloa
         .evt = evt,
         .payload = payload,
     };
+    ek_err_t err = EK_ERR_NONE;
     ek_ringbuf_write_spsc(s_isr_fifo, &req);
+    EK_ERR_GOTO(err, defer);
 
+defer:
     ek_evoke_exit_critical();
+    return err;
 }
 
-void ek_evoke_event_publish_from_isr(ek_evoke_event_handle_t evt, void *payload)
+ek_err_t ek_evoke_event_publish_from_isr(ek_evoke_event_handle_t evt, void *payload)
 {
     ek_assert_param(evt != NULL);
 
@@ -284,12 +288,16 @@ void ek_evoke_event_publish_from_isr(ek_evoke_event_handle_t evt, void *payload)
         .evt = evt,
         .payload = payload,
     };
-    ek_ringbuf_write_spsc(s_isr_fifo, &req);
+    ek_err_t err = EK_ERR_NONE;
+    err = ek_ringbuf_write_spsc(s_isr_fifo, &req);
+    EK_ERR_GOTO(err, defer);
 
+defer:
     ek_evoke_exit_critical();
+    return err;
 }
 
-void ek_evoke_event_defer_from_isr(ek_evoke_event_handle_t evt, void *payload, uint32_t delay, bool broadcast)
+ek_err_t ek_evoke_event_defer_from_isr(ek_evoke_event_handle_t evt, void *payload, uint32_t delay, bool broadcast)
 {
     ek_assert_param(evt != NULL);
 
@@ -304,7 +312,13 @@ void ek_evoke_event_defer_from_isr(ek_evoke_event_handle_t evt, void *payload, u
     };
     ek_ringbuf_write_spsc(s_isr_fifo, &req);
 
+    ek_err_t err = EK_ERR_NONE;
+    err = ek_ringbuf_write_spsc(s_isr_fifo, &req);
+    EK_ERR_GOTO(err, defer);
+
+defer:
     ek_evoke_exit_critical();
+    return err;
 }
 
 void ek_evoke_event_loop(void)
@@ -316,7 +330,7 @@ void ek_evoke_event_loop(void)
         while (!ek_ringbuf_empty_spsc(s_isr_fifo))
         {
             _isr_req_t req = { 0 };
-            if (ek_ringbuf_read_spsc(s_isr_fifo, &req))
+            if (ek_ringbuf_read_spsc(s_isr_fifo, &req) == EK_ERR_NONE)
             {
                 if (req.type & ISR_REQ_PUBLISH)
                 {
