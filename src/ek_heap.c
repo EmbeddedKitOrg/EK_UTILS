@@ -60,8 +60,8 @@
  * ==================================================================================
  */
 
-#ifdef EK_HEAP_SECTION
-static uint8_t s_default_heap[EKCFG_HEAP_SIZE] __EK_SECTION(EK_HEAP_SECTION);
+#ifdef EKCFG_HEAP_SECTION
+static uint8_t s_default_heap[EKCFG_HEAP_SIZE] __EK_SECTION(EKCFG_HEAP_SECTION);
 #else
 static uint8_t s_default_heap[EKCFG_HEAP_SIZE];
 #endif

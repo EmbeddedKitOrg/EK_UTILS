@@ -46,7 +46,7 @@
 
 #define EKCFG_HEAP_TLSF    (1)
 #define EKCFG_HEAP_SIZE    (16 * 1024)  /* 根据 MCU SRAM 调整 */
-// #define EK_HEAP_SECTION ".heap"       /* 指定默认堆的链接器段（需配合链接脚本） */
+// #define EKCFG_HEAP_SECTION ".heap"    /* 指定默认堆的链接器段（需配合链接脚本） */
 #define EKCFG_LOG_DEBUG    (1)
 #define EKCFG_LOG_COLOR    (0)          /* 串口终端不支持 ANSI 时关 */
 #define EKCFG_LOG_BUF_SIZE (128)
