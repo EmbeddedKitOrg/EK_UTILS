@@ -14,39 +14,42 @@
 
 ```
 ek_utils/
-├── inc/                         # 头文件
-│   ├── ek_conf.h                # 全局配置（所有模块开关和参数）
-│   ├── ek_def.h                 # 跨编译器兼容层（__EK_WEAK / __EK_PACKED 等）
-│   ├── ek_err.h                 # 错误码定义（ek_err_t）和错误处理宏
-│   ├── ek_assert.h              # 断言模块
-│   ├── ek_log.h                 # 分级日志模块
-│   ├── ek_io.h                  # IO 输出封装（lwprintf / picolibc / 空实现）
-│   ├── ek_heap.h                # 内存堆管理（基于 TLSF）
-│   ├── ek_list.h                # 双向循环链表（纯头文件）
-│   ├── ek_vec.h                 # 类型安全动态数组（纯头文件，宏生成类型）
-│   ├── ek_ringbuf.h             # 环形缓冲区（通用 + SPSC 无锁变体）
-│   ├── ek_stack.h               # 通用 LIFO 栈
-│   ├── ek_str.h                 # 动态字符串
-│   ├── ek_export.h              # 函数自动导出初始化（类似 Linux initcall）
-│   └── ek_evoke.h               # 协作式事件驱动任务调度器
-├── src/                         # 源文件
+├── cmake/                         # 交叉编译工具链
+│   └── gcc-arm-none-eabi.cmake
+├── CMakeLists.txt                 # 构建入口（独立时设工具链，子模块时自动跳过）
+├── ek_conf_template.h             # 用户配置模板 → 复制到项目改名为 ek_conf.h
+├── inc/                           # 头文件
+│   ├── ek_conf.h                  # 配置入口（独立构建时直接引入默认值）
+│   ├── ek_conf_default.h          # 全部默认值 + #ifndef 守卫 + 依赖校验
+│   ├── ek_def.h                   # 跨编译器兼容层（__EK_WEAK / __EK_PACKED 等）
+│   ├── ek_err.h                   # 错误码定义（ek_err_t）和错误处理宏
+│   ├── ek_assert.h                # 断言模块
+│   ├── ek_log.h                   # 分级日志模块
+│   ├── ek_io.h                    # IO 输出封装（lwprintf / picolibc / 空实现）
+│   ├── ek_heap.h                  # 内存堆管理（基于 TLSF）
+│   ├── ek_list.h                  # 双向循环链表（纯头文件）
+│   ├── ek_vec.h                   # 类型安全动态数组（纯头文件，宏生成类型）
+│   ├── ek_ringbuf.h               # 环形缓冲区（通用 + SPSC 无锁变体）
+│   ├── ek_stack.h                 # 通用 LIFO 栈
+│   ├── ek_str.h                   # 动态字符串
+│   ├── ek_export.h                # 函数自动导出初始化（类似 Linux initcall）
+│   └── ek_evoke.h                 # 协作式事件驱动任务调度器
+├── src/                           # 源文件
 │   ├── ek_assert.c
 │   ├── ek_evoke.c
 │   ├── ek_export.c
 │   ├── ek_heap.c
 │   ├── ek_io.c
 │   ├── ek_log.c
-│   ├── ek_picolibc_port.c        # picolibc 适配层
+│   ├── ek_picolibc_port.c          # picolibc 适配层
 │   ├── ek_ringbuf.c
 │   ├── ek_stack.c
 │   └── ek_str.c
-├── third_party/                 # 第三方代码
-│   ├── tlsf/                    # TLSF 实时内存分配器（O(1) 分配/释放）
-│   ├── lwprintf/                # 轻量级 printf 实现
-│   └── picolibc/                # 轻量级 C 标准库（含 Cortex-M 预编译库）
-├── cmake/
-│   └── gcc-arm-none-eabi.cmake  # ARM 交叉编译工具链配置
-└── CMakeLists.txt               # CMake 构建配置
+├── third_party/                   # 第三方代码
+│   ├── tlsf/                       # TLSF 实时内存分配器（O(1) 分配/释放）
+│   ├── lwprintf/                   # 轻量级 printf 实现
+│   └── picolibc/                   # 轻量级 C 标准库（含 Cortex-M 预编译库）
+└── README.md
 ```
 
 ## 模块清单
@@ -118,30 +121,91 @@ Include Paths:
   - third_party/lwprintf/lwprintf.c
 ```
 
-### 方式三：在 CMake 项目中作为子目录引入
+### 方式三：在 CMake 项目中作为子目录引入（子模块推荐）
 
 ```cmake
 # 在你的 CMakeLists.txt 中
-add_subdirectory(path/to/ek_utils)
-target_link_libraries(your_app ek_utils)
-```
+# 1. 确保你的 Inc 路径在 ek_utils 之前（配置覆盖）
+target_include_directories(your_app PRIVATE Core/Inc)
 
-### 对象库模式使用
+# 2. 对象库模式引入（.o 直接链接到你的可执行文件）
+set(OBJ_LIB ON CACHE BOOL "")
 
-如果 ek_utils 编译为对象库（`OBJ_LIB=ON`），在你的 CMake 中：
-
-```cmake
 add_subdirectory(path/to/ek_utils)
 target_link_libraries(your_app $<TARGET_OBJECTS:ek_utils>)
-# 对象库模式下需自行处理 picolibc 链接
 ```
+
+> **配置方式**：复制仓库根目录的 `ek_conf_template.h` 到你的 `Core/Inc/ek_conf.h`，
+> 按硬件调整宏值，文件末尾 `#include "ek_conf_default.h"` 不可删除。
+> 你的 `ek_conf.h` 会因 include 优先级自动覆盖库内的默认配置，子模块零修改。
 
 ## 配置说明
 
-所有配置集中在 `inc/ek_conf.h`，修改宏值即可启用/禁用模块：
+库提供两套配置机制，适用于不同场景：
+
+### 默认配置（独立构建）
+
+直接构建 ek_utils 时，`ek_conf.h` 自动引入 `ek_conf_default.h` 中的全部默认值，
+无需额外操作。
+
+### 项目配置（子模块模式）
+
+作为子模块引入 MCU 项目时，在你的项目中创建 `ek_conf.h` 覆盖默认值：
+
+1. 复制仓库根目录的 `ek_conf_template.h` → 你的项目 `Inc/ek_conf.h`
+2. 只保留需要覆盖的宏，删除其余行
+3. 文件末尾 `#include "ek_conf_default.h"` 必须保留
+4. 确保你的 `Inc/` 在 include 搜索路径中优先于 ek_utils/inc/
 
 ```c
-/* 平台/运行环境 */
+// 你的 Core/Inc/ek_conf.h
+#ifndef EK_CONF_H
+#define EK_CONF_H
+
+// ===== 平台 =====
+#define EKCFG_RTOS      (0)
+#define EKCFG_PICOLIBC  (0)
+#define EKCFG_IO_LWPRTF (1)
+
+// ===== 核心服务 =====
+#define EKCFG_EXPORT (0)
+#define EKCFG_ASSERT (1)
+#define EKCFG_LOG    (1)
+
+// ===== 数据结构 =====
+#define EKCFG_STR          (1)
+#define EKCFG_LIST         (1)
+#define EKCFG_VEC          (1)
+#define EKCFG_RINGBUF      (1)
+#define EKCFG_RINGBUF_SPSC (1)
+#define EKCFG_STACK        (1)
+#define EKCFG_EVOKE        (1)
+
+// ===== 模块子配置 =====
+#define EKCFG_HEAP_TLSF    (1)
+#define EKCFG_HEAP_SIZE    (16 * 1024)  // 按 MCU SRAM 调整
+#define EKCFG_LOG_DEBUG    (1)
+#define EKCFG_LOG_COLOR    (0)          // 串口不支持 ANSI 时关闭
+#define EKCFG_LOG_BUF_SIZE (128)
+#define EKCFG_ASSERT_TINY  (1)
+#define EKCFG_ASSERT_LOG   (1)
+
+// 引入默认值和校验 —— 此行必须保留
+#include "ek_conf_default.h"
+
+#endif
+```
+
+### 原理解释
+
+- 库内 `ek_conf.h` 仅一行 `#include "ek_conf_default.h"`（所有宏带 `#ifndef` 守卫）
+- 你的 `ek_conf.h` include 优先级更高，先被找到
+- 你的文件先定义宏，再 include `ek_conf_default.h`——已定义的宏不会被覆盖
+- 依赖校验在 `ek_conf_default.h` 末尾，始终执行
+
+### 可用配置宏
+
+```c
 #define EKCFG_RTOS      (0)     // 是否使用 RTOS
 #define EKCFG_PICOLIBC  (1)     // 是否使用 picolibc（自动关闭 lwprintf）
 #define EKCFG_IO_LWPRTF (0)     // IO 是否使用 lwprintf

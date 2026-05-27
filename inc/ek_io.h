@@ -48,6 +48,13 @@ void ek_io_init(void);
 
 #elif EKCFG_PICOLIBC == 1
 
+#    include <stdio.h>
+
+/**
+ * @brief 底层字符输出函数声明
+ */
+void _ek_io_fputc(int ch);
+
 /**
  * @brief 定义字符输出函数（picolibc 模式）
  * @note 用户需要实现此函数，用于底层字符输出（如 UART）
