@@ -8,7 +8,6 @@
 
 #if EKCFG_STACK == 1
 
-#    include "ek_err.h"
 #    include "ek_assert.h"
 #    include "ek_heap.h"
 
