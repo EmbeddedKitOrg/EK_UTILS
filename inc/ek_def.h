@@ -23,7 +23,7 @@
 #include <inttypes.h>
 
 /* lwprintf 自带 va_list 支持，使用 lwprintf 时不需要 stdarg */
-#include "ek_conf.h"
+#include "ek_conf_internal.h"
 #if EKCFG_IO_LWPRTF != 1
 #    include <stdarg.h>
 #endif

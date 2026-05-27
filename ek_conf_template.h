@@ -3,9 +3,10 @@
  *
  * 使用方法:
  *   1. 将此文件复制到你的项目 include 路径中，命名为 ek_conf.h
- *   2. 确保你的 include 路径优先级高于 ek_utils/inc/
- *   3. 只保留你需要覆盖的宏，删除其余行
- *      （未定义的宏会从 ek_conf_default.h 取默认值）
+ *   2. 按需修改各宏的值（不修改的宏自动取默认值）
+ *   3. 确保 ek_conf.h 能被编译器找到：
+ *      - CMake 方式：cmake -DEK_CONF_PATH="Core/Inc/ek_conf.h"
+ *      - include 优先级：你的 Inc/ 路径优先于 ek_utils/inc/
  */
 
 #ifndef EK_CONF_H
@@ -45,15 +46,11 @@
 
 #define EKCFG_HEAP_TLSF    (1)
 #define EKCFG_HEAP_SIZE    (16 * 1024)  /* 根据 MCU SRAM 调整 */
+// #define EK_HEAP_SECTION ".heap"       /* 指定默认堆的链接器段（需配合链接脚本） */
 #define EKCFG_LOG_DEBUG    (1)
 #define EKCFG_LOG_COLOR    (0)          /* 串口终端不支持 ANSI 时关 */
 #define EKCFG_LOG_BUF_SIZE (128)
 #define EKCFG_ASSERT_TINY  (1)
 #define EKCFG_ASSERT_LOG   (1)
-
-/* ========================================================================
- * 引入默认值和校验 — 此行必须保留
- * ======================================================================== */
-#include "ek_conf_default.h"
 
 #endif /* EK_CONF_H */

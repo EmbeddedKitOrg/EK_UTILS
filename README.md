@@ -16,11 +16,10 @@
 ek_utils/
 ├── cmake/                         # 交叉编译工具链
 │   └── gcc-arm-none-eabi.cmake
-├── CMakeLists.txt                 # 构建入口（独立时设工具链，子模块时自动跳过）
-├── ek_conf_template.h             # 用户配置模板 → 复制到项目改名为 ek_conf.h
+├── CMakeLists.txt                 # 构建入口（对象库，子模块友好）
+├── ek_conf_template.h             # 配置模板 → 复制到项目改名为 ek_conf.h
 ├── inc/                           # 头文件
-│   ├── ek_conf.h                  # 配置入口（独立构建时直接引入默认值）
-│   ├── ek_conf_default.h          # 全部默认值 + #ifndef 守卫 + 依赖校验
+│   ├── ek_conf_internal.h         # 内部配置入口（引入用户 ek_conf.h + 默认值 + 校验）
 │   ├── ek_def.h                   # 跨编译器兼容层（__EK_WEAK / __EK_PACKED 等）
 │   ├── ek_err.h                   # 错误码定义（ek_err_t）和错误处理宏
 │   ├── ek_assert.h                # 断言模块
@@ -72,26 +71,7 @@ ek_utils/
 
 ## 快速上手
 
-### 方式一：CMake 集成（推荐）
-
-```bash
-# 配置（必须指定 MCU 平台，如 cm4）
-cmake -DPLATFORM=cm4 -G Ninja -B build
-
-# 构建静态库
-ninja -C build
-# → build/libek_utils.a
-
-# 使用 picolibc 作为标准库（可选）
-cmake -DPLATFORM=cm4 -DPICOLIBC=ON -G Ninja -B build
-ninja -C build
-
-# 对象库模式（仅编译 .o 文件，不打包 .a）
-cmake -DPLATFORM=cm4 -DOBJ_LIB=ON -G Ninja -B build
-ninja -C build
-```
-
-### 支持的 MCU 平台
+### 支持平台
 
 | PLATFORM | CPU | FPU |
 |----------|-----|-----|
@@ -103,9 +83,28 @@ ninja -C build
 | cm33 | Cortex-M33 | fpv5-sp-d16 (hard) |
 | cm55 | Cortex-M55 | fpv5-auto (hard) |
 
-### 方式二：源文件直接集成
+### 方式一：子模块集成（推荐）
 
-将以下内容加入你的项目编译系统：
+```bash
+# 在你的 MCU 项目根目录
+git submodule add https://github.com/N1netyNine99/ek_utils.git lib/ek_utils
+```
+
+CMakeLists.txt 配置：
+
+```cmake
+# 1. 你的 include 路径在前（确保 ek_conf.h 优先被找到）
+target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)
+
+# 2. 引入 ek_utils 对象库
+add_subdirectory(lib/ek_utils)
+target_link_libraries(${PROJECT_NAME} $<TARGET_OBJECTS:ek_utils>)
+
+# 3. 可选：通过 EK_CONF_PATH 显式指定 ek_conf.h 位置
+#    cmake -DEK_CONF_PATH="Core/Inc/ek_conf.h" ...
+```
+
+### 方式二：源文件直接集成
 
 ```
 Include Paths:
@@ -121,101 +120,51 @@ Include Paths:
   - third_party/lwprintf/lwprintf.c
 ```
 
-### 方式三：在 CMake 项目中作为子目录引入（子模块推荐）
-
-```cmake
-# 在你的 CMakeLists.txt 中
-# 1. 确保你的 Inc 路径在 ek_utils 之前（配置覆盖）
-target_include_directories(your_app PRIVATE Core/Inc)
-
-# 2. 对象库模式引入（.o 直接链接到你的可执行文件）
-set(OBJ_LIB ON CACHE BOOL "")
-
-add_subdirectory(path/to/ek_utils)
-target_link_libraries(your_app $<TARGET_OBJECTS:ek_utils>)
-```
-
-> **配置方式**：复制仓库根目录的 `ek_conf_template.h` 到你的 `Core/Inc/ek_conf.h`，
-> 按硬件调整宏值，文件末尾 `#include "ek_conf_default.h"` 不可删除。
-> 你的 `ek_conf.h` 会因 include 优先级自动覆盖库内的默认配置，子模块零修改。
-
 ## 配置说明
 
-库提供两套配置机制，适用于不同场景：
+ek_utils 不内置默认配置文件。**用户必须创建自己的 `ek_conf.h`**，否则编译报错。
 
-### 默认配置（独立构建）
+### 创建配置文件
 
-直接构建 ek_utils 时，`ek_conf.h` 自动引入 `ek_conf_default.h` 中的全部默认值，
-无需额外操作。
+1. 复制仓库根目录的 `ek_conf_template.h` → 你的项目 include 路径，改名为 `ek_conf.h`
+2. 按硬件调整宏值（不需要改的可以删掉，未定义的宏自动取默认值）
+3. 确保编译器能找到你的 `ek_conf.h`
 
-### 项目配置（子模块模式）
+### 指定配置文件的两种方式
 
-作为子模块引入 MCU 项目时，在你的项目中创建 `ek_conf.h` 覆盖默认值：
+**方式 A：CMake 传参（推荐）**
 
-1. 复制仓库根目录的 `ek_conf_template.h` → 你的项目 `Inc/ek_conf.h`
-2. 只保留需要覆盖的宏，删除其余行
-3. 文件末尾 `#include "ek_conf_default.h"` 必须保留
-4. 确保你的 `Inc/` 在 include 搜索路径中优先于 ek_utils/inc/
-
-```c
-// 你的 Core/Inc/ek_conf.h
-#ifndef EK_CONF_H
-#define EK_CONF_H
-
-// ===== 平台 =====
-#define EKCFG_RTOS      (0)
-#define EKCFG_PICOLIBC  (0)
-#define EKCFG_IO_LWPRTF (1)
-
-// ===== 核心服务 =====
-#define EKCFG_EXPORT (0)
-#define EKCFG_ASSERT (1)
-#define EKCFG_LOG    (1)
-
-// ===== 数据结构 =====
-#define EKCFG_STR          (1)
-#define EKCFG_LIST         (1)
-#define EKCFG_VEC          (1)
-#define EKCFG_RINGBUF      (1)
-#define EKCFG_RINGBUF_SPSC (1)
-#define EKCFG_STACK        (1)
-#define EKCFG_EVOKE        (1)
-
-// ===== 模块子配置 =====
-#define EKCFG_HEAP_TLSF    (1)
-#define EKCFG_HEAP_SIZE    (16 * 1024)  // 按 MCU SRAM 调整
-#define EKCFG_LOG_DEBUG    (1)
-#define EKCFG_LOG_COLOR    (0)          // 串口不支持 ANSI 时关闭
-#define EKCFG_LOG_BUF_SIZE (128)
-#define EKCFG_ASSERT_TINY  (1)
-#define EKCFG_ASSERT_LOG   (1)
-
-// 引入默认值和校验 —— 此行必须保留
-#include "ek_conf_default.h"
-
-#endif
+```bash
+cmake -DEK_CONF_PATH="Core/Inc/ek_conf.h" -B build
 ```
 
-### 原理解释
+CMakeLists.txt 中的 `target_compile_definitions` 会自动把路径传给编译器，
+`ek_conf_internal.h` 会 `#include` 指定路径。
 
-- 库内 `ek_conf.h` 仅一行 `#include "ek_conf_default.h"`（所有宏带 `#ifndef` 守卫）
-- 你的 `ek_conf.h` include 优先级更高，先被找到
-- 你的文件先定义宏，再 include `ek_conf_default.h`——已定义的宏不会被覆盖
-- 依赖校验在 `ek_conf_default.h` 末尾，始终执行
+**方式 B：include 优先级**
 
-### 可用配置宏
+确保你的 `ek_conf.h` 所在目录在 include 搜索路径中优先于 `ek_utils/inc/`。
+在 CMake 中，`target_include_directories` 写在 `add_subdirectory` 之前的路径优先级更高。
+
+```cmake
+target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)  # 在前 → 优先
+add_subdirectory(lib/ek_utils)
+```
+
+### 配置宏完整列表
 
 ```c
+// 平台/运行环境
 #define EKCFG_RTOS      (0)     // 是否使用 RTOS
-#define EKCFG_PICOLIBC  (1)     // 是否使用 picolibc（自动关闭 lwprintf）
-#define EKCFG_IO_LWPRTF (0)     // IO 是否使用 lwprintf
+#define EKCFG_PICOLIBC  (0)     // 是否使用 picolibc（自动关闭 lwprintf）
+#define EKCFG_IO_LWPRTF (1)     // IO 是否使用 lwprintf
 
-/* 核心服务（1=启用，0=禁用） */
+// 核心服务（1=启用，0=禁用）
 #define EKCFG_EXPORT (0)
 #define EKCFG_ASSERT (1)
 #define EKCFG_LOG    (1)
 
-/* 数据结构（1=启用，0=禁用） */
+// 数据结构（1=启用，0=禁用）
 #define EKCFG_STR          (1)
 #define EKCFG_LIST         (1)
 #define EKCFG_VEC          (1)
@@ -224,14 +173,14 @@ target_link_libraries(your_app $<TARGET_OBJECTS:ek_utils>)
 #define EKCFG_STACK        (1)
 #define EKCFG_EVOKE        (1)
 
-/* 子配置 */
-#define EKCFG_HEAP_TLSF    (1)         // 使用 TLSF 分配器
-#define EKCFG_HEAP_SIZE    (30 * 1024) // 默认堆大小
-#define EKCFG_LOG_DEBUG    (1)         // 启用 DEBUG 日志
-#define EKCFG_LOG_COLOR    (1)         // 启用彩色日志
-#define EKCFG_LOG_BUF_SIZE (256)       // 日志缓冲区大小
-#define EKCFG_ASSERT_TINY  (1)         // 轻量级断言
-#define EKCFG_ASSERT_LOG   (1)         // 断言时输出日志
+// 子配置
+#define EKCFG_HEAP_TLSF    (1)          // 使用 TLSF 分配器
+#define EKCFG_HEAP_SIZE    (16 * 1024)  // 堆大小（按 MCU SRAM 调整）
+#define EKCFG_LOG_DEBUG    (1)          // 启用 DEBUG 日志
+#define EKCFG_LOG_COLOR    (0)          // ANSI 彩色日志
+#define EKCFG_LOG_BUF_SIZE (128)        // 日志缓冲区
+#define EKCFG_ASSERT_TINY  (1)          // 轻量级断言
+#define EKCFG_ASSERT_LOG   (1)          // 断言时输出日志
 ```
 
 ### picolibc vs lwprintf
@@ -241,7 +190,19 @@ target_link_libraries(your_app $<TARGET_OBJECTS:ek_utils>)
 | 标准 IO (picolibc) | `EKCFG_PICOLIBC=1` | ek_printf → printf，ek_malloc → picolibc malloc |
 | 轻量 IO (lwprintf) | `EKCFG_IO_LWPRTF=1, EKCFG_PICOLIBC=0` | ek_printf → lwprintf，适合没有完整 libc 的环境 |
 
-## 设计约定
+### 原理解释
+
+```
+库源文件
+  └→ #include "ek_conf_internal.h"
+       ├→ #include 用户的 ek_conf.h     （用户定义的宏）
+       ├→ 填充用户未定义的宏（#ifndef 守卫）
+       └→ 依赖校验（picolibc 冲突、evoke+RTOS 冲突等）
+```
+
+用户只需定义要改的宏，其余自动取默认值。
+
+## 平台适配
 
 ### 弱函数（Weak Functions）
 
@@ -249,11 +210,31 @@ target_link_libraries(your_app $<TARGET_OBJECTS:ek_utils>)
 
 ```c
 // 需要用户实现的弱函数
-__EK_WEAK void _ek_io_fputc(int ch)     // 字符输出（UART 等）
-__EK_WEAK uint32_t _ek_log_get_tick(void) // 系统时间戳
-__EK_WEAK void ek_evoke_enter_critical(void)  // 进入临界区
-__EK_WEAK void ek_evoke_light_sleep(void)     // 浅睡眠（WFI）
+void _ek_io_fputc(int ch)               // 字符输出（UART 等）
+uint32_t _ek_log_get_tick(void)          // 系统时间戳
+void ek_evoke_enter_critical(void)       // 进入临界区
+void ek_evoke_light_sleep(void)          // 浅睡眠（WFI）
 ```
+
+### 在 STM32 项目中的典型实现
+
+```c
+// ek_port.c
+#include "ek_io.h"
+#include "ek_log.h"
+
+void _ek_io_fputc(int ch)
+{
+    HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+}
+
+uint32_t _ek_log_get_tick(void)
+{
+    return HAL_GetTick();
+}
+```
+
+## 设计约定
 
 ### 错误码体系
 

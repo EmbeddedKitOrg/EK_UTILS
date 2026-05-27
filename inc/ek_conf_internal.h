@@ -1,14 +1,37 @@
 /**
- * @file ek_conf_default.h
- * @brief EmbeddedKit 默认配置——所有宏均用 #ifndef 守卫，可由用户配置覆盖
+ * @file ek_conf_internal.h
+ * @brief EmbeddedKit 内部配置入口——库内所有模块均通过此文件获取配置
  * @author N1netyNine99
  *
- * 此文件由 ek_conf.h 引入，不要在用户代码中直接 include。
- * 用户只需在自己的 ek_conf.h 中先 #define 需要覆盖的宏，再 include 此文件。
+ * 本文件负责：
+ *   1. 引入用户提供的 ek_conf.h
+ *   2. 为用户未定义的 EKCFG_* 宏填充默认值
+ *   3. 执行配置依赖校验
+ *
+ * 用户无需直接 include 或修改此文件。
+ * 只需在自己的项目中创建 ek_conf.h（复制仓库根目录的 ek_conf_template.h 并改名），
+ * 覆盖所需的宏，其余自动取默认值。
+ *
+ * 指定用户 ek_conf.h 的两种方式：
+ *   A. CMake 参数：cmake -DEK_CONF_PATH="path/to/ek_conf.h"
+ *   B. include 优先级：确保你的 ek_conf.h 所在路径先于 ek_utils/inc/ 被搜索到
  */
 
-#ifndef EK_CONF_DEFAULT_H
-#define EK_CONF_DEFAULT_H
+#ifndef EK_CONF_INTERNAL_H
+#define EK_CONF_INTERNAL_H
+
+/*
+ * ========================================================================
+ * 引入用户配置
+ * ========================================================================
+ * 方式 A：CMake 传 -DEK_CONF_PATH="xxx" → 编译期宏展开为 include 路径
+ * 方式 B：未设置 EK_CONF_PATH → 使用标准 include 搜索，需保证用户路径优先
+ */
+#ifdef EK_CONF_PATH
+#    include EK_CONF_PATH
+#else
+#    include "ek_conf.h"
+#endif
 
 /* ========================================================================
  * 平台/运行环境
@@ -103,4 +126,4 @@
 #    error "EKCFG_EVOKE requires EKCFG_RTOS == 0 (bare-metal only)"
 #endif
 
-#endif /* EK_CONF_DEFAULT_H */
+#endif /* EK_CONF_INTERNAL_H */

@@ -9,7 +9,7 @@
 #ifndef EK_LIST_H
 #define EK_LIST_H
 
-#include "ek_conf.h"
+#include "ek_conf_internal.h"
 
 #if EKCFG_LIST == 1
 

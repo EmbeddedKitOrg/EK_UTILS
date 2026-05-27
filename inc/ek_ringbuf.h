@@ -9,7 +9,7 @@
 #ifndef EK_RINGBUF_H
 #define EK_RINGBUF_H
 
-#include "ek_conf.h"
+#include "ek_conf_internal.h"
 
 #if (EKCFG_RINGBUF == 1) || (EKCFG_RINGBUF_SPSC == 1)
 

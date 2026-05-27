@@ -9,7 +9,7 @@
  * - stdout: putchar → _ek_io_fputc
  */
 
-#include "ek_conf.h"
+#include "ek_conf_internal.h"
 
 #if EKCFG_PICOLIBC == 1
 

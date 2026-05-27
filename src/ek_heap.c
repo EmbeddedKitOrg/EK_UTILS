@@ -60,7 +60,11 @@
  * ==================================================================================
  */
 
+#ifdef EK_HEAP_SECTION
+static uint8_t s_default_heap[EKCFG_HEAP_SIZE] __EK_SECTION(EK_HEAP_SECTION);
+#else
 static uint8_t s_default_heap[EKCFG_HEAP_SIZE];
+#endif
 static tlsf_t  s_default_tlsf;
 
 static size_t s_unused_bytes = 0;

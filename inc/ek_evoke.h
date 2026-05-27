@@ -13,7 +13,7 @@
 #ifndef EK_EVOKE_H
 #define EK_EVOKE_H
 
-#include "ek_conf.h"
+#include "ek_conf_internal.h"
 
 #if EKCFG_RTOS == 0 && EKCFG_EVOKE == 1
 
