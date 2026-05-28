@@ -86,6 +86,9 @@
 #ifndef EKCFG_EVOKE
 #    define EKCFG_EVOKE (1) /**< 事件驱动调度器 */
 #endif
+#ifndef EKCFG_PICOTHREAD
+#    define EKCFG_PICOTHREAD (1) /**< 微线程 */
+#endif
 
 /* ========================================================================
  * 模块子配置
