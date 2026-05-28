@@ -19,6 +19,7 @@
 
 #    include "ek_def.h"
 #    include "ek_list.h"
+#    include "ek_err.h"
 
 /**
  * @brief ISR 请求队列最大容量
@@ -183,19 +184,19 @@ void ek_evoke_event_defer(ek_evoke_event_handle_t evt, void *payload, uint32_t d
  * @brief ISR 中广播事件
  * @param evt 事件句柄
  * @param payload 事件携带的数据
- *
+ * @return 执行情况
  * @note 请求会被放入 ISR 请求队列，在主循环中处理
  */
-void ek_evoke_event_broadcast_from_isr(ek_evoke_event_handle_t evt, void *payload);
+ek_err_t ek_evoke_event_broadcast_from_isr(ek_evoke_event_handle_t evt, void *payload);
 
 /**
  * @brief ISR 中发布事件
  * @param evt 事件句柄
  * @param payload 事件携带的数据
- *
+ * @return 执行情况
  * @note 请求会被放入 ISR 请求队列，在主循环中处理
  */
-void ek_evoke_event_publish_from_isr(ek_evoke_event_handle_t evt, void *payload);
+ek_err_t ek_evoke_event_publish_from_isr(ek_evoke_event_handle_t evt, void *payload);
 
 /**
  * @brief ISR 中延迟发布事件
@@ -203,10 +204,10 @@ void ek_evoke_event_publish_from_isr(ek_evoke_event_handle_t evt, void *payload)
  * @param payload 事件携带的数据
  * @param delay 延迟时间（tick）
  * @param broadcast true 广播模式，false 发布模式
- *
+ * @return 执行情况
  * @note 请求会被放入 ISR 请求队列，在主循环中处理
  */
-void ek_evoke_event_defer_from_isr(ek_evoke_event_handle_t evt, void *payload, uint32_t delay, bool broadcast);
+ek_err_t ek_evoke_event_defer_from_isr(ek_evoke_event_handle_t evt, void *payload, uint32_t delay, bool broadcast);
 
 /* ========== 睡眠锁 ========== */
 

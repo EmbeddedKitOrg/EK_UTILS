@@ -64,7 +64,7 @@ typedef uint8_t ek_err_t;
 /* ========== 错误处理辅助宏 ========== */
 
 /** 如果表达式返回非 EK_ERR_NONE，直接 return 该错误码 */
-#define EK_RETURN_IF_ERR(expr)                  \
+#define EK_ERR_RETURN(expr)                     \
     do                                          \
     {                                           \
         ek_err_t _err_ = (expr);                \
@@ -72,7 +72,7 @@ typedef uint8_t ek_err_t;
     } while (0)
 
 /** 如果表达式返回非 EK_ERR_NONE，goto 到指定标签（用于 cleanup 模式） */
-#define EK_GOTO_IF_ERR(expr, label)           \
+#define EK_ERR_GOTO(expr, label)              \
     do                                        \
     {                                         \
         ek_err_t _err_ = (expr);              \
