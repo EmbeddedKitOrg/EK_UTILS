@@ -10,7 +10,6 @@
 
 #    include "ek_io.h"
 #    include "ek_heap.h"
-#    include "ek_err.h"
 #    include "ek_assert.h"
 
 #    define INDEX_CLAMP(idx, len)             \

@@ -10,7 +10,6 @@
 
 #    include "ek_heap.h"
 #    include "ek_assert.h"
-#    include "ek_err.h"
 
 #    if EKCFG_RINGBUF == 1
 #        if EKCFG_RTOS == 1
