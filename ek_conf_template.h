@@ -39,6 +39,7 @@
 #define EKCFG_RINGBUF_SPSC (1)
 #define EKCFG_STACK        (1)
 #define EKCFG_EVOKE        (1)
+#define EKCFG_PICOTHREAD   (1)
 
 /* ========================================================================
  * 模块子配置 — 根据实际硬件调整
