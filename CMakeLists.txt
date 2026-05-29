@@ -51,7 +51,11 @@ endif()
 add_library(ek_utils OBJECT ${EK_SOURCES} ${TP_SOURCES})
 
 target_include_directories(ek_utils PUBLIC ${EK_INCLUDE_DIRS})
-target_compile_options(ek_utils PRIVATE -Os -g)
+target_compile_options(ek_utils PRIVATE
+    -Os
+    -g
+    -fdiagnostics-color=always
+)
 
 if(EK_CONF_PATH)
     target_compile_definitions(ek_utils PUBLIC EK_CONF_PATH="${EK_CONF_PATH}")
