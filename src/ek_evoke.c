@@ -54,6 +54,7 @@ static ek_list_node_t s_defer_evt_list;
 
 static _defer_req_t *_defer_req_malloc(void);
 static void _defer_req_free(_defer_req_t *req);
+static bool _ek_evoke_can_deep_sleep(void);
 
 __EK_STATIC_INLINE void _ek_evoke_set_timer(uint32_t xtick)
 {
@@ -372,11 +373,9 @@ void ek_evoke_event_loop(void)
             }
         }
 
-        // 检查睡眠锁，根据锁的状态来执行不同的睡眠状态
-        // 如果有锁没有释放，则去浅睡眠 WFI
-        // 如果所有的锁都释放了，则进行深度睡眠
-        if (s_sleep_lock) ek_evoke_light_sleep();
-        else ek_evoke_deep_sleep();
+        // 检查睡眠锁和最近的延时唤醒时间，决定进入哪种睡眠状态
+        if (_ek_evoke_can_deep_sleep()) ek_evoke_deep_sleep();
+        else ek_evoke_light_sleep();
 
         // 中断唤醒，要去检查是否有延时事件被唤醒
         // 如果有，则依次唤醒
@@ -401,6 +400,14 @@ void ek_evoke_event_loop(void)
             s_defer_earliest_tick = UINT32_MAX;
         }
     }
+}
+static bool _ek_evoke_can_deep_sleep(void)
+{
+    if (s_sleep_lock) return false;
+    if (ek_list_is_empty(&s_defer_evt_list)) return true;
+
+    uint32_t idle_tick = s_defer_earliest_tick - s_event_tick_base;
+    return idle_tick >= EKCFG_EVOKE_MIN_DEEPSLEEP_TICK;
 }
 
 static _defer_req_t *_defer_req_malloc(void)
