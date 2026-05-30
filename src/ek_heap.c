@@ -7,7 +7,7 @@
 #include "ek_heap.h"
 
 #if EKCFG_HEAP_TLSF == 1
-
+#    include "ek_export.h"
 /*
  * @note 内存管理都来自于 tlsf(../third_party/tlsf/tlsf.c),对于不同大小的内存需求管理，
  * 建议修改下面两个参数来抉择一个合适的内存管理的开销(去上述的源码中修改)
@@ -60,12 +60,12 @@
  * ==================================================================================
  */
 
-#ifdef EKCFG_HEAP_SECTION
+#    ifdef EKCFG_HEAP_SECTION
 static uint8_t s_default_heap[EKCFG_HEAP_SIZE] __EK_SECTION(EKCFG_HEAP_SECTION);
-#else
+#    else
 static uint8_t s_default_heap[EKCFG_HEAP_SIZE];
-#endif
-static tlsf_t  s_default_tlsf;
+#    endif
+static tlsf_t s_default_tlsf;
 
 static size_t s_unused_bytes = 0;
 static size_t s_used_bytes = 0;
@@ -81,6 +81,8 @@ void ek_heap_init(void)
     s_default_tlsf = tlsf_create_with_pool(s_default_heap, EKCFG_HEAP_SIZE);
     while (s_default_tlsf == NULL);
 }
+
+EK_EXPORT_EARLIEST(ek_heap_init);
 
 void ek_heap_destory(void)
 {
