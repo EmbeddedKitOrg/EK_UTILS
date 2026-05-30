@@ -66,28 +66,28 @@
  * ======================================================================== */
 
 #ifndef EKCFG_STR
-#    define EKCFG_STR (1) /**< 动态字符串 */
+#    define EKCFG_STR (0) /**< 动态字符串 */
 #endif
 #ifndef EKCFG_LIST
-#    define EKCFG_LIST (1) /**< 双向循环链表 */
+#    define EKCFG_LIST (0) /**< 双向循环链表 */
 #endif
 #ifndef EKCFG_VEC
-#    define EKCFG_VEC (1) /**< 动态数组 */
+#    define EKCFG_VEC (0) /**< 动态数组 */
 #endif
 #ifndef EKCFG_RINGBUF
-#    define EKCFG_RINGBUF (1) /**< 通用环形缓冲区 */
+#    define EKCFG_RINGBUF (0) /**< 通用环形缓冲区 */
 #endif
 #ifndef EKCFG_RINGBUF_SPSC
-#    define EKCFG_RINGBUF_SPSC (1) /**< SPSC 无锁环形缓冲区 */
+#    define EKCFG_RINGBUF_SPSC (0) /**< SPSC 无锁环形缓冲区 */
 #endif
 #ifndef EKCFG_STACK
-#    define EKCFG_STACK (1) /**< 通用栈 */
+#    define EKCFG_STACK (0) /**< 通用栈 */
 #endif
 #ifndef EKCFG_EVOKE
-#    define EKCFG_EVOKE (1) /**< 事件驱动调度器 */
+#    define EKCFG_EVOKE (0) /**< 事件驱动调度器 */
 #endif
 #ifndef EKCFG_PICOTHREAD
-#    define EKCFG_PICOTHREAD (1) /**< 微线程 */
+#    define EKCFG_PICOTHREAD (0) /**< 微线程 */
 #endif
 
 /* ========================================================================
@@ -115,7 +115,9 @@
 #ifndef EKCFG_ASSERT_LOG
 #    define EKCFG_ASSERT_LOG (1) /**< 断言失败时输出日志 */
 #endif
-
+#ifndef EKCFG_EVOKE_MIN_DEEPSLEEP_TICK
+#    define EKCFG_EVOKE_MIN_DEEPSLEEP_TICK (10) /**< 进入深度睡眠最小tick */
+#endif
 /* ========================================================================
  * 配置依赖校验（始终执行，不区分配置来源）
  * ======================================================================== */
