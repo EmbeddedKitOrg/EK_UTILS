@@ -26,6 +26,7 @@ struct ek_pt_t
     const char *name;
     uint8_t prio;
     ek_pt_state_t state;
+    uint32_t tick;
     uint32_t line;
     ek_list_node_t state_node;
     ek_list_node_t event_node;
