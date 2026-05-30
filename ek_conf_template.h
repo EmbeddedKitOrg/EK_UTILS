@@ -16,42 +16,45 @@
  * 平台/运行环境
  * ======================================================================== */
 
-#define EKCFG_RTOS      (0) /* 是否使用 RTOS (0=裸机) */
-#define EKCFG_PICOLIBC  (0) /* 是否使用 picolibc */
-#define EKCFG_IO_LWPRTF (1) /* IO 后端: lwprintf */
+#define EKCFG_RTOS      (0) /**< 是否使用 RTOS (0=裸机) */
+#define EKCFG_PICOLIBC  (0) /**< 是否使用 picolibc 替代标准 libc */
+#define EKCFG_IO_LWPRTF (1) /**< IO 是否使用 lwprintf (1=使用, 0=不使用) */
 
 /* ========================================================================
  * 核心服务
  * ======================================================================== */
 
-#define EKCFG_EXPORT (0)
-#define EKCFG_ASSERT (1)
-#define EKCFG_LOG    (1)
+#define EKCFG_EXPORT (0) /**< 自动初始化机制 */
+#define EKCFG_ASSERT (1) /**< 断言模块 */
+#define EKCFG_LOG    (1) /**< 日志模块 */
 
 /* ========================================================================
  * 数据结构
  * ======================================================================== */
 
-#define EKCFG_STR          (1)
-#define EKCFG_LIST         (1)
-#define EKCFG_VEC          (1)
-#define EKCFG_RINGBUF      (1)
-#define EKCFG_RINGBUF_SPSC (1)
-#define EKCFG_STACK        (1)
-#define EKCFG_EVOKE        (1)
-#define EKCFG_PICOTHREAD   (1)
+#define EKCFG_STR            (1) /**< 动态字符串 */
+#define EKCFG_LIST           (1) /**< 双向循环链表 */
+#define EKCFG_VEC            (1) /**< 动态数组 */
+#define EKCFG_RINGBUF        (1) /**< 通用环形缓冲区 */
+#define EKCFG_RINGBUF_SPSC   (1) /**< SPSC 无锁环形缓冲区 */
+#define EKCFG_STACK          (1) /**< 通用栈 */
+#define EKCFG_EVOKE          (1) /**< 事件驱动调度器 */
+#define EKCFG_PICOTHREAD     (1) /**< 微线程 */
+#define EKCFG_PICOTHREAD_SEM (1) /**< 微线程信号量 (依赖 PICOTHREAD) */
+#define EKCFG_PICOTHREAD_MSG (1) /**< 微线程消息队列 (依赖 PICOTHREAD) */
 
 /* ========================================================================
  * 模块子配置 — 根据实际硬件调整
  * ======================================================================== */
 
-#define EKCFG_HEAP_SECTION             ".heap"
-#define EKCFG_HEAP_TLSF                (1)
-#define EKCFG_HEAP_SIZE                (16 * 1024)
-#define EKCFG_LOG_DEBUG                (1)
-#define EKCFG_LOG_COLOR                (0)
-#define EKCFG_LOG_BUF_SIZE             (128)
-#define EKCFG_ASSERT_TINY              (1)
-#define EKCFG_ASSERT_LOG               (1)
-#define EKCFG_EVOKE_MIN_DEEPSLEEP_TICK (10)
+#define EKCFG_HEAP_SECTION             ".heap" /**< 堆内存所在链接器段 (如 ".tcmram") */
+#define EKCFG_HEAP_TLSF                (1) /**< 内存堆使用 TLSF 分配器 (1=TLSF, 0=自定义) */
+#define EKCFG_HEAP_SIZE                (16 * 1024) /**< 内存堆大小（字节） */
+#define EKCFG_LOG_DEBUG                (1) /**< 启用 DEBUG 级别日志 */
+#define EKCFG_LOG_COLOR                (0) /**< 启用 ANSI 彩色日志 */
+#define EKCFG_LOG_BUF_SIZE             (128) /**< 日志缓冲区大小（字节） */
+#define EKCFG_ASSERT_TINY              (1) /**< 使用轻量级断言模式 */
+#define EKCFG_ASSERT_LOG               (1) /**< 断言失败时输出日志 */
+#define EKCFG_EVOKE_MIN_DEEPSLEEP_TICK (10) /**< 进入深度睡眠最小 tick */
+
 #endif /* EK_CONF_H */

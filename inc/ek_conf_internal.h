@@ -89,6 +89,12 @@
 #ifndef EKCFG_PICOTHREAD
 #    define EKCFG_PICOTHREAD (0) /**< 微线程 */
 #endif
+#ifndef EKCFG_PICOTHREAD_SEM
+#    define EKCFG_PICOTHREAD_SEM (0) /**< 微线程信号量 */
+#endif
+#ifndef EKCFG_PICOTHREAD_MSG
+#    define EKCFG_PICOTHREAD_MSG (0) /**< 微线程消息队列 */
+#endif
 
 /* ========================================================================
  * 模块子配置
@@ -130,5 +136,12 @@
 #if EKCFG_EVOKE == 1 && EKCFG_RTOS == 1
 #    error "EKCFG_EVOKE requires EKCFG_RTOS == 0 (bare-metal only)"
 #endif
+#if EKCFG_PICOTHREAD_SEM == 1 && EKCFG_PICOTHREAD == 0
+#    error "EKCFG_PICOTHREAD_SEM requires EKCFG_PICOTHREAD == 1"
+#endif
+#if EKCFG_PICOTHREAD_MSG == 1 && EKCFG_PICOTHREAD == 0
+#    error "EKCFG_PICOTHREAD_MSG requires EKCFG_PICOTHREAD == 1"
+#endif
+
 
 #endif /* EK_CONF_INTERNAL_H */
