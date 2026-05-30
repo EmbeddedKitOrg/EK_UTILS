@@ -71,7 +71,7 @@ ek_err_t ek_str_append_len(ek_str_t *s, const char *str, uint32_t len)
     ek_assert_param(str != NULL);
     ek_assert_param(len != 0);
 
-    EK_RETURN_IF_ERR(_str_ensure_cap(s, s->len + len + 1));
+    EK_ERR_RETURN(_str_ensure_cap(s, s->len + len + 1));
     memcpy(s->buf + s->len, str, len);
 
     s->len += len;
@@ -92,7 +92,7 @@ ek_err_t ek_str_append_fmt(ek_str_t *s, const char *fmt, ...)
 
     if (len < 0) return EK_ERR_PARSE;
 
-    EK_RETURN_IF_ERR(_str_ensure_cap(s, s->len + len));
+    EK_ERR_RETURN(_str_ensure_cap(s, s->len + len));
 
     va_start(args, fmt);
     // +1 给 \0
