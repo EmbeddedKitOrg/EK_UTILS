@@ -8,7 +8,8 @@
 
 #if EKCFG_IO_LWPRTF == 1
 
-#    include "../inc/ek_def.h"
+#    include "ek_def.h"
+#    include "ek_export.h"
 
 /* 前向声明 */
 static int _ek_io_printf(int ch, lwprintf_t *lwp);
@@ -23,6 +24,8 @@ void ek_io_init(void)
 {
     lwprintf_init(_ek_io_printf);
 }
+
+EK_EXPORT_COMPONENTS(ek_io_init);
 
 /* 静态函数实现 */
 static int _ek_io_printf(int ch, lwprintf_t *lwp)

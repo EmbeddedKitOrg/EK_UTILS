@@ -20,7 +20,7 @@ extern "C"
 
 #if EKCFG_IO_LWPRTF == 1
 
-#    include "../../third_party/lwprintf/inc/lwprintf.h"
+#    include "lwprintf.h"
 
 /**
  * @brief 定义字符输出函数
