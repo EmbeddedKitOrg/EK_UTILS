@@ -1,5 +1,4 @@
 #include "ek_picothread.h"
-
 #if EKCFG_PICOTHREAD == 1
 
 #    include "ek_heap.h"
@@ -46,16 +45,53 @@ ek_pt_handle_t ek_pt_create(const char *name, ek_pt_cb_t cb, uint8_t prio, void 
     pt->line = 0;
     ek_list_init(&pt->event_node);
     ek_list_init(&pt->state_node);
+#    if EKCFG_PICOTHREAD_SEM || EKCFG_PICOTHREAD_MSG
+    pt->wait_result = EK_ERR_NONE;
+#    endif
+#    if EKCFG_PICOTHREAD_SEM
+    pt->wait_sem = NULL;
+#    endif /* EKCFG_PICOTHREAD_SEM */
+#    if EKCFG_PICOTHREAD_MSG
+    pt->wait_msg = NULL;
+#    endif /* EKCFG_PICOTHREAD_MSG */
 
     _insert_state_by_prio(&s_ready_list, pt);
 
     return pt;
 }
 
-void ek_pt_destroy(ek_pt_t *pt)
+void ek_pt_destroy(ek_pt_handle_t pt)
 {
     ek_assert_param(pt != NULL);
-    // TODO 在删除任务的时候需要考虑在事件节点中的相关处理
+    ek_assert_param(pt != s_cur_pt);
+
+    // 从状态链表移除（就绪或阻塞）
+    if (pt->state == EK_PT_STATE_READY || pt->state == EK_PT_STATE_BLOCK)
+    {
+        ek_list_remove(&pt->state_node);
+    }
+
+#    if EKCFG_PICOTHREAD_SEM
+    // 从信号量等待链表移除
+    if (pt->wait_sem != NULL)
+    {
+        ek_list_remove(&pt->event_node);
+        pt->wait_sem = NULL;
+    }
+#    endif
+#    if EKCFG_PICOTHREAD_MSG
+    // 从消息队列等待链表移除
+    if (pt->wait_msg != NULL)
+    {
+        ek_list_remove(&pt->event_node);
+        pt->wait_msg = NULL;
+    }
+#    endif
+#    if EKCFG_PICOTHREAD_SEM || EKCFG_PICOTHREAD_MSG
+    pt->wait_result = EK_ERR_ABORTED;
+#    endif
+
+    ek_free(pt);
 }
 
 uint32_t ek_pt_schedule(uint32_t now)
@@ -75,6 +111,25 @@ uint32_t ek_pt_schedule(uint32_t now)
         }
         ek_list_remove(pos);
         pt->state = EK_PT_STATE_READY;
+#    if EKCFG_PICOTHREAD_SEM || EKCFG_PICOTHREAD_MSG
+        // 超时退出时清理事件等待链表
+#        if EKCFG_PICOTHREAD_SEM
+        if (pt->wait_sem != NULL)
+        {
+            ek_list_remove(&pt->event_node);
+            pt->wait_sem = NULL;
+            pt->wait_result = EK_ERR_TIMEOUT;
+        }
+#        endif
+#        if EKCFG_PICOTHREAD_MSG
+        if (pt->wait_msg != NULL)
+        {
+            ek_list_remove(&pt->event_node);
+            pt->wait_msg = NULL;
+            pt->wait_result = EK_ERR_TIMEOUT;
+        }
+#        endif
+#    endif
         _insert_state_by_prio(&s_ready_list, pt);
     }
 
@@ -119,8 +174,7 @@ void ek_pt_block(ek_pt_handle_t pt, uint32_t xtick)
 {
     ek_assert_param(s_init == true);
     ek_assert_param(pt != NULL);
-
-    pt->tick = s_schedule_now + xtick;
+    pt->tick = (xtick == (uint32_t)-1) ? (uint32_t)-1 : s_schedule_now + xtick;
     if (pt == s_cur_pt)
     {
         pt->state = EK_PT_STATE_BLOCK;
@@ -167,8 +221,13 @@ void ek_pt_resume(ek_pt_handle_t pt)
     _insert_state_by_prio(&s_ready_list, pt);
 }
 
+ek_pt_handle_t ek_pt_active(void)
+{
+    return s_cur_pt;
+}
+
 #    if EKCFG_PICOTHREAD_SEM == 1
-ek_pt_sem_t *ek_pt_sem_create(uint8_t count)
+ek_pt_sem_handle_t ek_pt_sem_create(uint8_t count)
 {
     ek_pt_sem_t *sem = ek_malloc(sizeof(*sem));
     ek_assert_param(sem != NULL);
@@ -177,15 +236,179 @@ ek_pt_sem_t *ek_pt_sem_create(uint8_t count)
     return sem;
 }
 
-void ek_pt_sem_destroy(ek_pt_sem_t *sem)
+void ek_pt_sem_destroy(ek_pt_sem_handle_t sem)
 {
     ek_assert_param(sem != NULL);
-    // TODO 在删除任务的时候需要考虑在事件节点中的相关处理
+
+    // 唤醒所有等待此信号量的任务
+    ek_list_node_t *pos, *n;
+    ek_list_foreach_safe(pos, n, &sem->wait_list)
+    {
+        ek_pt_t *pt = ek_list_container(pos, ek_pt_t, event_node);
+        ek_list_remove(pos);
+        ek_list_remove(&pt->state_node);
+        pt->wait_sem = NULL;
+        pt->wait_result = EK_ERR_ABORTED;
+        _insert_state_by_prio(&s_ready_list, pt);
+        pt->state = EK_PT_STATE_READY;
+    }
+
+    ek_free(sem);
 }
+
+bool ek_pt_sem_take(ek_pt_sem_handle_t sem)
+{
+    ek_assert_param(sem != NULL);
+    ek_assert_param(s_cur_pt != NULL);
+
+    if (sem->count)
+    {
+        sem->count--;
+        return true;
+    }
+    s_cur_pt->wait_sem = sem;
+    _insert_event_by_prio(&sem->wait_list, s_cur_pt);
+    return false;
+}
+
+void ek_pt_sem_give(ek_pt_sem_handle_t sem)
+{
+    ek_assert_param(sem != NULL);
+
+    // 首先判断是否有等待的任务
+    // 如果有，则取出优先级最高
+    // 删除事件节点的所在链表位置
+    // 设置为就绪状态
+    if (!ek_list_is_empty(&sem->wait_list))
+    {
+        ek_list_node_t *node = ek_list_get_first(&sem->wait_list);
+        ek_pt_t *pt = ek_list_container(node, ek_pt_t, event_node);
+        ek_list_remove(node);
+        ek_list_remove(&pt->state_node);
+        pt->wait_sem = NULL;
+        pt->wait_result = EK_ERR_NONE;
+        _insert_state_by_prio(&s_ready_list, pt);
+        pt->state = EK_PT_STATE_READY;
+    }
+
+    // 如果没有，则增加计数值
+    sem->count++;
+}
+
 #    endif /* EKCFG_PICOTHREAD_SEM */
 
 #    if EKCFG_PICOTHREAD_MSG == 1
-// TODO 消息队列相关
+#        include "ek_ringbuf.h"
+
+ek_pt_msg_handle_t ek_pt_msg_create(size_t item_size, uint32_t item_amount)
+{
+    ek_pt_msg_t *msg = ek_malloc(sizeof(*msg));
+    ek_assert_param(msg != NULL);
+
+    msg->rb = ek_ringbuf_create(item_size, item_amount);
+    if (msg->rb == NULL)
+    {
+        ek_free(msg);
+        return NULL;
+    }
+
+    ek_list_init(&msg->recv_wait);
+    ek_list_init(&msg->send_wait);
+    return msg;
+}
+
+void ek_pt_msg_destroy(ek_pt_msg_handle_t msg)
+{
+    ek_assert_param(msg != NULL);
+
+    // 唤醒所有等待接收的任务
+    ek_list_node_t *pos, *n;
+    ek_list_foreach_safe(pos, n, &msg->recv_wait)
+    {
+        ek_pt_t *pt = ek_list_container(pos, ek_pt_t, event_node);
+        ek_list_remove(pos);
+        ek_list_remove(&pt->state_node);
+        pt->wait_msg = NULL;
+        pt->wait_result = EK_ERR_ABORTED;
+        _insert_state_by_prio(&s_ready_list, pt);
+        pt->state = EK_PT_STATE_READY;
+    }
+
+    // 唤醒所有等待发送的任务
+    ek_list_foreach_safe(pos, n, &msg->send_wait)
+    {
+        ek_pt_t *pt = ek_list_container(pos, ek_pt_t, event_node);
+        ek_list_remove(pos);
+        ek_list_remove(&pt->state_node);
+        pt->wait_msg = NULL;
+        pt->wait_result = EK_ERR_ABORTED;
+        _insert_state_by_prio(&s_ready_list, pt);
+        pt->state = EK_PT_STATE_READY;
+    }
+
+    ek_ringbuf_destroy(msg->rb);
+    ek_free(msg);
+}
+
+bool ek_pt_msg_send(ek_pt_msg_handle_t msg, const void *data)
+{
+    ek_assert_param(msg != NULL);
+    ek_assert_param(data != NULL);
+    ek_assert_param(s_cur_pt != NULL);
+
+    ek_err_t ret = ek_ringbuf_write(msg->rb, data);
+    if (ret == EK_ERR_NONE)
+    {
+        // 写入成功，唤醒一个等待接收的任务
+        if (!ek_list_is_empty(&msg->recv_wait))
+        {
+            ek_list_node_t *node = ek_list_get_first(&msg->recv_wait);
+            ek_pt_t *pt = ek_list_container(node, ek_pt_t, event_node);
+            ek_list_remove(node);
+            ek_list_remove(&pt->state_node);
+            pt->wait_msg = NULL;
+            pt->wait_result = EK_ERR_NONE;
+            _insert_state_by_prio(&s_ready_list, pt);
+            pt->state = EK_PT_STATE_READY;
+        }
+        return true;
+    }
+
+    // 缓冲区满，挂到发送等待队列
+    s_cur_pt->wait_msg = msg;
+    _insert_event_by_prio(&msg->send_wait, s_cur_pt);
+    return false;
+}
+
+bool ek_pt_msg_recv(ek_pt_msg_handle_t msg, void *data)
+{
+    ek_assert_param(msg != NULL);
+    ek_assert_param(s_cur_pt != NULL);
+
+    ek_err_t ret = ek_ringbuf_read(msg->rb, data);
+    if (ret == EK_ERR_NONE)
+    {
+        // 读取成功，唤醒一个等待发送的任务
+        if (!ek_list_is_empty(&msg->send_wait))
+        {
+            ek_list_node_t *node = ek_list_get_first(&msg->send_wait);
+            ek_pt_t *pt = ek_list_container(node, ek_pt_t, event_node);
+            ek_list_remove(node);
+            ek_list_remove(&pt->state_node);
+            pt->wait_msg = NULL;
+            pt->wait_result = EK_ERR_NONE;
+            _insert_state_by_prio(&s_ready_list, pt);
+            pt->state = EK_PT_STATE_READY;
+        }
+        return true;
+    }
+
+    // 缓冲区空，挂到接收等待队列
+    s_cur_pt->wait_msg = msg;
+    _insert_event_by_prio(&msg->recv_wait, s_cur_pt);
+    return false;
+}
+
 #    endif /* EKCFG_PICOTHREAD_MSG */
 
 __EK_STATIC_INLINE void _insert_state_by_prio(ek_list_node_t *list, ek_pt_t *pt)
