@@ -62,7 +62,7 @@ __EK_STATIC_INLINE void _ek_evoke_set_timer(uint32_t xtick)
     s_event_tick_diff = xtick;
 }
 
-void ek_evokes_sleep_lock(void)
+void ek_evoke_sleep_lock(void)
 {
     s_sleep_lock++;
 }
