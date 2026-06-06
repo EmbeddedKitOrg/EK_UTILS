@@ -28,7 +28,7 @@ void ek_pt_init(void)
     ek_list_init(&s_block_list);
 }
 
-EK_EXPORT_COMPONENTS(ek_pt_init);
+EK_EXPORT_COMPONENTS(ek_pt_init, 0);
 
 ek_pt_handle_t ek_pt_create(const char *name, ek_pt_cb_t cb, uint8_t prio, void *arg)
 {

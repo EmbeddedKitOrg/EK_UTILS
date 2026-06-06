@@ -82,7 +82,7 @@ void ek_heap_init(void)
     while (s_default_tlsf == NULL);
 }
 
-EK_EXPORT_EARLIEST(ek_heap_init);
+EK_EXPORT_EARLIEST(ek_heap_init, 0);
 
 void ek_heap_destory(void)
 {

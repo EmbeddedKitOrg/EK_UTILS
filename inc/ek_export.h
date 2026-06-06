@@ -11,7 +11,7 @@
  * {
  *     . = ALIGN(4);
  *     _ek_export_fn_start = .;
- *     KEEP(*(SORT(.ek_export_fn*)))
+ *     KEEP(*(.ek_export_fn*))
  *     . = ALIGN(4);
  *     _ek_export_fn_end = .;
  * } > flash
@@ -25,53 +25,58 @@
 
 #if (EKCFG_EXPORT == 1)
 
+#    include <stdint.h>
+
 /**
  * @brief 导出初始化函数类型
  */
 typedef void (*_ek_export_init_fn_t)(void);
 
 /**
- * @brief 字符串化辅助宏（内部使用）
+ * @brief 导出条目
  */
-#    define _EK_STR_HELPER(x) #x
+typedef struct
+{
+    uint16_t level;
+    uint16_t order;
+    _ek_export_init_fn_t fn;
+} _ek_export_item_t;
 
 /**
- * @brief 字符串化宏（内部使用）
+ * @brief 生成唯一符号名（内部使用）
  */
-#    define _EK_STR(x) _EK_STR_HELPER(x)
+#    define _EK_EXPORT_JOIN2(a, b) a##b
+#    define _EK_EXPORT_JOIN(a, b)  _EK_EXPORT_JOIN2(a, b)
 
 /**
  * @brief 导出函数宏
  * @param fn 要导出的函数指针
- * @param prio 优先级（数字越小越先执行）
+ * @param level 层级（数字越小越先执行）
+ * @param order 层内优先级（数字越小越先执行）
  *
- * @note 导出的函数会在 ek_export_init() 中按优先级顺序自动调用
- *
- * @example
- * void my_init(void)
- * {
- *     // 初始化代码
- * }
- * EK_EXPORT(my_init, 10);  // 优先级 10
+ * @note 所有条目先按 level 排序，再按 order 排序。
  */
-#    define EK_EXPORT(fn, prio)                                                                                       \
-        const _ek_export_init_fn_t __init_##fn##prio __attribute__((used, section(".ek_export_fn." _EK_STR(prio)))) = \
-            (fn)
+#    define EK_EXPORT_LEVEL(fn, level, order)                                       \
+        static const _ek_export_item_t _EK_EXPORT_JOIN(__ek_export_item_, __LINE__) \
+            __attribute__((used, section(".ek_export_fn"))) = { (uint16_t)(level), (uint16_t)(order), (fn) }
 
-#    define EK_EXPORT_EARLIEST(fn)   EK_EXPORT(fn, 0)
-#    define EK_EXPORT_HARDWARE(fn)   EK_EXPORT(fn, 1)
-#    define EK_EXPORT_COMPONENTS(fn) EK_EXPORT(fn, 2)
-#    define EK_EXPORT_APP(fn)        EK_EXPORT(fn, 3)
-#    define EK_EXPORT_USER(fn)       EK_EXPORT(fn, 4)
+/**
+ * @brief 分层导出宏
+ */
+#    define EK_EXPORT_EARLIEST(fn, order)   EK_EXPORT_LEVEL(fn, 0, order)
+#    define EK_EXPORT_HARDWARE(fn, order)   EK_EXPORT_LEVEL(fn, 1, order)
+#    define EK_EXPORT_COMPONENTS(fn, order) EK_EXPORT_LEVEL(fn, 2, order)
+#    define EK_EXPORT_APP(fn, order)        EK_EXPORT_LEVEL(fn, 3, order)
+#    define EK_EXPORT_USER(fn, order)       EK_EXPORT_LEVEL(fn, 4, order)
 
 #else
 
-#    define EK_EXPORT_EARLIEST(fn)
-#    define EK_EXPORT(fn, prio)
-#    define EK_EXPORT_HARDWARE(fn)
-#    define EK_EXPORT_COMPONENTS(fn)
-#    define EK_EXPORT_APP(fn)
-#    define EK_EXPORT_USER(fn)
+#    define EK_EXPORT_LEVEL(fn, level, order)
+#    define EK_EXPORT_EARLIEST(fn, order)
+#    define EK_EXPORT_HARDWARE(fn, order)
+#    define EK_EXPORT_COMPONENTS(fn, order)
+#    define EK_EXPORT_APP(fn, order)
+#    define EK_EXPORT_USER(fn, order)
 
 #endif /* EKCFG_EXPORT */
 
@@ -82,7 +87,7 @@ extern "C"
 
 /**
  * @brief 执行所有导出的初始化函数
- * @note 按优先级顺序调用所有通过 EK_EXPORT 导出的函数
+ * @note 运行时先按层级和层内优先级排序，再逐个调用
  */
 void ek_export_init(void);
 
