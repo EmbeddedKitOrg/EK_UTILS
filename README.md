@@ -555,7 +555,7 @@ EK_LOG_ERROR("fatal: code=%d", err);
 
 **依赖**：
 - ek_def、ek_conf_internal
-- ek_export（`ek_heap_init` 通过 `EK_EXPORT_EARLIEST` 自动初始化）
+- ek_export（`ek_heap_init` 通过 `EK_EXPORT_EARLIEST(fn, 0)` 自动初始化）
 
 **配置宏**：
 | 宏 | 默认值 | 说明 |
@@ -571,7 +571,7 @@ EK_LOG_ERROR("fatal: code=%d", err);
 
 **链接脚本变更**：如果定义 `EKCFG_HEAP_SECTION`，需确保链接脚本中有对应的段（如 `.tcmram`）。默认无需变更。
 
-**初始化**：`ek_heap_init()` 通过 `EK_EXPORT_EARLIEST`（优先级 0）自动初始化，前提是已启用 `EKCFG_EXPORT=1` 并配置链接脚本段。否则需在 `main()` 起始手动调用。
+**初始化**：`ek_heap_init()` 通过 `EK_EXPORT_EARLIEST(fn, 0)`（level=0）自动初始化，前提是已启用 `EKCFG_EXPORT=1` 并配置链接脚本段。否则需在 `main()` 起始手动调用。
 
 **注意事项**：
 - TLSF 内部管理开销约 768 字节（默认配置 `FL_INDEX_MAX=24, SL_INDEX_COUNT_LOG2=3`），可根据实际内存池大小调整（见 `ek_heap.c` 顶部注释）
@@ -781,7 +781,7 @@ ek_str_free(s);
 
 ### ek_export — 自动初始化
 
-**功能概述**：基于链接器段的函数自动导出和初始化，类似 Linux `initcall`。通过 `EK_EXPORT(fn, prio)` 将函数指针放入 `.ek_export_fn` 段，`ek_export_init()` 按优先级顺序自动调用。
+**功能概述**：基于链接器段的函数自动导出和初始化，类似 Linux `initcall`。通过 `EK_EXPORT_LEVEL(fn, level, order)` 将函数指针放入 `.ek_export_fn` 段，`ek_export_init()` 运行时按 `level`（层级）和 `order`（层内优先级）排序后逐个调用——排序通过 `qsort` 在运行时完成，不依赖链接器行为。
 
 **源文件**：
 - `ek_utils/inc/ek_export.h`
@@ -805,7 +805,7 @@ ek_str_free(s);
 {
     . = ALIGN(4);
     _ek_export_fn_start = .;
-    KEEP(*(SORT(.ek_export_fn*)))
+    KEEP(*(.ek_export_fn*))
     . = ALIGN(4);
     _ek_export_fn_end = .;
 } > FLASH
@@ -815,7 +815,7 @@ ek_str_free(s);
 
 ```c
 int main(void) {
-    ek_export_init(); // 按优先级顺序调用所有 EK_EXPORT 函数
+    ek_export_init(); // 按 level → order 排序后调用所有导出函数
     // ...
 }
 ```
@@ -825,20 +825,20 @@ int main(void) {
 void my_init(void) {
     // 初始化代码
 }
-EK_EXPORT(my_init, 3); // 优先级 3（数字越小越先执行）
+EK_EXPORT_LEVEL(my_init, 3, 0); // level=3（应用层），order=0
 
-// 预定义优先级别名
-EK_EXPORT_EARLIEST(heap_init);   // prio=0 — 堆初始化
-EK_EXPORT_HARDWARE(hw_init);     // prio=1 — 硬件初始化
-EK_EXPORT_COMPONENTS(comp_init); // prio=2 — 组件初始化
-EK_EXPORT_APP(app_init);         // prio=3 — 应用初始化
-EK_EXPORT_USER(user_init);       // prio=4 — 用户初始化
+// 预定义层级别名（等价于 EK_EXPORT_LEVEL(fn, level, order)）
+EK_EXPORT_EARLIEST(heap_init, 0);    // level=0 — 堆初始化
+EK_EXPORT_HARDWARE(hw_init, 0);      // level=1 — 硬件初始化
+EK_EXPORT_COMPONENTS(comp_init, 0);  // level=2 — 组件初始化
+EK_EXPORT_APP(app_init, 0);          // level=3 — 应用初始化
+EK_EXPORT_USER(user_init, 0);        // level=4 — 用户初始化
 ```
 
 **注意事项**：
-- `KEEP(*(SORT(.ek_export_fn*)))` 保证即使 `--gc-sections` 也不会移除导出函数
-- 相同优先级按链接顺序执行（依赖链接器行为，不推荐依赖）
-- `EKCFG_EXPORT=0` 时所有 `EK_EXPORT` 宏展开为空
+- 排序规则：先按 `level`（层级，0–4）升序，同层级内按 `order`（层内优先级）升序；通过 `qsort` 在运行时完成
+- `KEEP(*(.ek_export_fn*))` 保证即使 `--gc-sections` 也不会移除导出函数
+- `EKCFG_EXPORT=0` 时所有导出宏展开为空
 - ek_utils 内部模块（heap/evoke/picothread）自身也通过此机制自动初始化
 
 ---
@@ -877,7 +877,7 @@ EK_EXPORT_USER(user_init);       // prio=4 — 用户初始化
 | `ek_evoke_light_sleep()` | 浅睡眠 | `__WFI()` |
 | `ek_evoke_deep_sleep()` | 深度睡眠 | 进入低功耗模式（STOP/STANDBY），需配置唤醒源 |
 
-**链接脚本变更**：无（但如果使用 `EK_EXPORT` 自动初始化则需配置 `.ek_export` 段）。
+**链接脚本变更**：无（但如果使用 `EK_EXPORT_LEVEL` 自动初始化则需配置 `.ek_export` 段）。
 
 **初始化**：`ek_evoke_init()` 通过 `EK_EXPORT_COMPONENTS` 自动初始化，或手动调用。初始化后通过 `ek_evoke_event_loop()` 进入主循环（永不返回）。
 
@@ -929,9 +929,9 @@ void TIMER_IRQHandler(void) {
 
 **用户需实现的接口**：无 — 无弱函数，纯调度器。
 
-**链接脚本变更**：使用 `EK_EXPORT` 自动初始化则需配置 `.ek_export` 段。
+**链接脚本变更**：使用 `EK_EXPORT_LEVEL` 自动初始化则需配置 `.ek_export` 段。
 
-**初始化**：`ek_pt_init()` 通过 `EK_EXPORT_COMPONENTS`（优先级 2）自动初始化，或手动调用。
+**初始化**：`ek_pt_init()` 通过 `EK_EXPORT_COMPONENTS`（level=2）自动初始化，或手动调用。
 
 **主循环模式**：
 
