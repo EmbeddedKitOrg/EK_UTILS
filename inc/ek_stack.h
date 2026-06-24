@@ -36,7 +36,7 @@ struct ek_stack_t
     size_t item_size; /**< 单个元素的大小（字节） */
     uint32_t cap; /**< 栈的最大容量 */
 #    if EKCFG_RTOS == 1
-    bool lock;
+    EK_LOCK_TYPE lock;
 #    endif /* EKCFG_RTOS */
 };
 

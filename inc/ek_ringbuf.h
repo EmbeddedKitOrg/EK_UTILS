@@ -31,7 +31,7 @@ struct ek_ringbuf_t
     size_t cap; /**< 缓冲区容量（元素个数） */
     size_t item_size; /**< 单个元素大小（字节） */
 #        if EKCFG_RTOS == 1
-    bool lock;
+    EK_LOCK_TYPE lock;
 #        endif /* EKCFG_RTOS */
 };
 #    endif /* EKCFG_RINGBUF */

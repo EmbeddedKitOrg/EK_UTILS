@@ -17,6 +17,17 @@
  * ======================================================================== */
 
 #define EKCFG_RTOS      (0) /**< 是否使用 RTOS (0=裸机) */
+/* RTOS 锁配置（EKCFG_RTOS == 1 时需在 ek_conf.h 中定义）：
+ * 包含你的 RTOS 头文件，然后定义锁类型和操作宏：
+ *   #include "FreeRTOS.h"
+ *   #include "semphr.h"
+ *   #define EK_LOCK_TYPE         SemaphoreHandle_t
+ *   #define EK_LOCK_INIT(lock)   ((lock) = xSemaphoreCreateMutex())
+ *   #define EK_LOCK_DEINIT(lock) vSemaphoreDelete(lock)
+ *   #define EK_LOCK_TRY(obj)     (xSemaphoreTake((obj)->lock, 0) == pdTRUE)
+ *   #define EK_LOCK_ACQUIRE(obj) (xSemaphoreTake((obj)->lock, portMAX_DELAY) == pdTRUE)
+ *   #define EK_LOCK_RELEASE(obj) xSemaphoreGive((obj)->lock)
+ */
 #define EKCFG_PICOLIBC  (0) /**< 是否使用 picolibc 替代标准 libc */
 #define EKCFG_IO_LWPRTF (1) /**< IO 是否使用 lwprintf (1=使用, 0=不使用) */
 

@@ -12,15 +12,6 @@
 #    include "ek_assert.h"
 
 #    if EKCFG_RINGBUF == 1
-#        if EKCFG_RTOS == 1
-#            define EK_LOCKUP(prb)    ((prb)->lock = true)
-#            define EK_UNLOCK(prb)    ((prb)->lock = false)
-#            define EK_LOCK_TEST(prb) ((prb)->lock == true)
-#        else
-#            define EK_LOCKUP(prb)
-#            define EK_UNLOCK(prb)
-#            define EK_LOCK_TEST(prb) (false)
-#        endif /* EKCFG_RTOS */
 
 bool ek_ringbuf_full(const ek_ringbuf_t *rb)
 {
@@ -57,7 +48,7 @@ ek_ringbuf_t *ek_ringbuf_create(size_t item_size, uint32_t item_amount)
     rb->write_idx = 0;
     rb->item_amount = 0;
 #        if EKCFG_RTOS == 1
-    rb->lock = false;
+    EK_LOCK_INIT(rb->lock);
 #        endif /* EKCFG_RTOS */
 
     return rb;
@@ -66,6 +57,9 @@ ek_ringbuf_t *ek_ringbuf_create(size_t item_size, uint32_t item_amount)
 void ek_ringbuf_destroy(ek_ringbuf_t *rb)
 {
     ek_assert_param(rb != NULL);
+#        if EKCFG_RTOS == 1
+    EK_LOCK_DEINIT(rb->lock);
+#        endif
 
     ek_free(rb->buffer);
     ek_free(rb);
@@ -76,13 +70,11 @@ ek_err_t ek_ringbuf_write(ek_ringbuf_t *rb, const void *item)
     ek_assert_param(item != NULL);
     ek_assert_param(rb != NULL);
 
-    if (EK_LOCK_TEST(rb) == true) return EK_ERR_BUSY;
-
-    EK_LOCKUP(rb);
+    if (!EK_LOCK_TRY(rb)) return EK_ERR_BUSY;
 
     if (ek_ringbuf_full(rb) == true)
     {
-        EK_UNLOCK(rb);
+        EK_LOCK_RELEASE(rb);
         return EK_ERR_FULL;
     }
 
@@ -92,7 +84,7 @@ ek_err_t ek_ringbuf_write(ek_ringbuf_t *rb, const void *item)
     rb->write_idx = (rb->write_idx + 1) % rb->cap;
     rb->item_amount++;
 
-    EK_UNLOCK(rb);
+    EK_LOCK_RELEASE(rb);
 
     return EK_ERR_NONE;
 }
@@ -101,13 +93,11 @@ ek_err_t ek_ringbuf_read(ek_ringbuf_t *rb, void *item)
 {
     ek_assert_param(rb != NULL);
 
-    if (EK_LOCK_TEST(rb) == true) return EK_ERR_BUSY;
-
-    EK_LOCKUP(rb);
+    if (!EK_LOCK_TRY(rb)) return EK_ERR_BUSY;
 
     if (ek_ringbuf_empty(rb) == true)
     {
-        EK_UNLOCK(rb);
+        EK_LOCK_RELEASE(rb);
         return EK_ERR_EMPTY;
     }
 
@@ -120,7 +110,7 @@ ek_err_t ek_ringbuf_read(ek_ringbuf_t *rb, void *item)
     rb->read_idx = (rb->read_idx + 1) % rb->cap;
     rb->item_amount--;
 
-    EK_UNLOCK(rb);
+    EK_LOCK_RELEASE(rb);
 
     return EK_ERR_NONE;
 }
@@ -130,20 +120,18 @@ ek_err_t ek_ringbuf_peek(ek_ringbuf_t *rb, void *item)
     ek_assert_param(item != NULL);
     ek_assert_param(rb != NULL);
 
-    if (EK_LOCK_TEST(rb) == true) return EK_ERR_BUSY;
-
-    EK_LOCKUP(rb);
+    if (!EK_LOCK_TRY(rb)) return EK_ERR_BUSY;
 
     if (ek_ringbuf_empty(rb) == true)
     {
-        EK_UNLOCK(rb);
+        EK_LOCK_RELEASE(rb);
         return EK_ERR_EMPTY;
     }
 
     const uint8_t *source = rb->buffer + (rb->read_idx * rb->item_size);
     memcpy(item, source, rb->item_size);
 
-    EK_UNLOCK(rb);
+    EK_LOCK_RELEASE(rb);
 
     return EK_ERR_NONE;
 }

@@ -48,6 +48,60 @@
 #endif
 
 /* ========================================================================
+ * 锁抽象层 — RTOS 线程安全
+ * ========================================================================
+ * 裸机模式下所有宏为空操作；RTOS 模式下用户在 ek_conf.h 中定义：
+ *   #include "FreeRTOS.h"
+ *   #include "semphr.h"
+ *   #define EK_LOCK_TYPE         SemaphoreHandle_t
+ *   #define EK_LOCK_INIT(lock)   ((lock) = xSemaphoreCreateMutex())
+ *   #define EK_LOCK_DEINIT(lock) vSemaphoreDelete(lock)
+ *   #define EK_LOCK_TRY(obj)     (xSemaphoreTake((obj)->lock, 0) == pdTRUE)
+ *   #define EK_LOCK_ACQUIRE(obj) (xSemaphoreTake((obj)->lock, portMAX_DELAY) == pdTRUE)
+ *   #define EK_LOCK_RELEASE(obj) xSemaphoreGive((obj)->lock)
+ * 因 ek_conf.h 在本文件 #include 阶段已被引入，用户定义优先于以下默认值。
+ */
+#if EKCFG_RTOS == 1
+#    ifndef EK_LOCK_TYPE
+#        error "EKCFG_RTOS == 1: EK_LOCK_TYPE must be defined in ek_conf.h"
+#    endif
+#    ifndef EK_LOCK_INIT
+#        error "EKCFG_RTOS == 1: EK_LOCK_INIT must be defined in ek_conf.h"
+#    endif
+#    ifndef EK_LOCK_DEINIT
+#        error "EKCFG_RTOS == 1: EK_LOCK_DEINIT must be defined in ek_conf.h"
+#    endif
+#    ifndef EK_LOCK_TRY
+#        error "EKCFG_RTOS == 1: EK_LOCK_TRY must be defined in ek_conf.h"
+#    endif
+#    ifndef EK_LOCK_ACQUIRE
+#        error "EKCFG_RTOS == 1: EK_LOCK_ACQUIRE must be defined in ek_conf.h"
+#    endif
+#    ifndef EK_LOCK_RELEASE
+#        error "EKCFG_RTOS == 1: EK_LOCK_RELEASE must be defined in ek_conf.h"
+#    endif
+#endif
+
+#ifndef EK_LOCK_TYPE
+#    define EK_LOCK_TYPE int
+#endif
+#ifndef EK_LOCK_INIT
+#    define EK_LOCK_INIT(lock) (void)(lock)
+#endif
+#ifndef EK_LOCK_DEINIT
+#    define EK_LOCK_DEINIT(lock) (void)(lock)
+#endif
+#ifndef EK_LOCK_TRY
+#    define EK_LOCK_TRY(obj) (1)
+#endif
+#ifndef EK_LOCK_ACQUIRE
+#    define EK_LOCK_ACQUIRE(obj) (void)(obj)
+#endif
+#ifndef EK_LOCK_RELEASE
+#    define EK_LOCK_RELEASE(obj) (void)(obj)
+#endif
+
+/* ========================================================================
  * 核心服务开关
  * ======================================================================== */
 
@@ -142,6 +196,5 @@
 #if EKCFG_PICOTHREAD_MSG == 1 && EKCFG_PICOTHREAD == 0
 #    error "EKCFG_PICOTHREAD_MSG requires EKCFG_PICOTHREAD == 1"
 #endif
-
 
 #endif /* EK_CONF_INTERNAL_H */

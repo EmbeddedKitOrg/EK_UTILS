@@ -8,18 +8,12 @@
 
 #if EKCFG_LOG == 1
 
-#    define EK_LOG_COLOR_NONE   "\033[0;0m"
-#    define EK_LOG_COLOR_INFO   "\033[94m"
-#    define EK_LOG_COLOR_DEBUG  "\033[92m"
-#    define EK_LOG_COLOR_WARN   "\033[33m"
-#    define EK_LOG_COLOR_ERROR  "\033[91m"
-#    define EK_LOG_COLOR_FATAL  "\033[30;41m"
-
-#    define EK_LOG_CHECK_LOCK() (s_lock == 1)
-#    define EK_LOG_LOCK()       (s_lock = 1)
-#    define EK_LOG_UNLOCK()     (s_lock = 0)
-
-static uint8_t s_lock = 0;
+#    define EK_LOG_COLOR_NONE  "\033[0;0m"
+#    define EK_LOG_COLOR_INFO  "\033[94m"
+#    define EK_LOG_COLOR_DEBUG "\033[92m"
+#    define EK_LOG_COLOR_WARN  "\033[33m"
+#    define EK_LOG_COLOR_ERROR "\033[91m"
+#    define EK_LOG_COLOR_FATAL "\033[30;41m"
 
 #    if (EKCFG_LOG_COLOR == 1)
 
@@ -40,10 +34,6 @@ __EK_WEAK uint32_t _ek_log_get_tick(void)
 
 void _ek_log_printf(const char *tag, uint32_t line, ek_log_level_t type, uint32_t tick, const char *fmt, ...)
 {
-    if (EK_LOG_CHECK_LOCK() == 1) return;
-
-    EK_LOG_LOCK();
-
 #    if (EKCFG_LOG_COLOR == 1)
     ek_printf(
         "%s[%s/%s L:%" PRIu32 ",T:%" PRIu32 "]:", s_log_color_table[type], s_log_type_table[type], tag, line, tick);
@@ -63,8 +53,6 @@ void _ek_log_printf(const char *tag, uint32_t line, ek_log_level_t type, uint32_
 #    endif /* EKCFG_LOG_COLOR == 1 */
 
     ek_printf(CRLF); // 换行符
-
-    EK_LOG_UNLOCK();
 }
 
 #endif /* EKCFG_LOG */

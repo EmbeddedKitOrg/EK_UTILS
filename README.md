@@ -59,12 +59,12 @@ ek_utils/
 | `ek_err` | 始终包含 | 基础层 | 错误码体系（`ek_err_t`），含 45+ 错误码和错误传播宏 |
 | `ek_def` | 始终包含 | 基础层 | 跨编译器兼容层（`__EK_WEAK`/`__EK_PACKED`/`__EK_INLINE` 等） |
 | `ek_io` | `EKCFG_IO_LWPRTF` / `EKCFG_PICOLIBC` | 核心服务 | IO 输出封装，支持 lwprintf 或 picolibc 两种后端 |
-| `ek_log` | `EKCFG_LOG` | 核心服务 | 分级日志（DEBUG/INFO/WARN/ERROR），支持 ANSI 彩色和时间戳 |
+| `ek_log` | `EKCFG_LOG` | 核心服务 | 分级日志（NONE/DEBUG/INFO/WARN/ERROR/FATAL），支持 ANSI 彩色、时间戳和按文件级别过滤 |
 | `ek_assert` | `EKCFG_ASSERT` | 核心服务 | 断言：tiny 模式（死循环）和 full 模式（输出详情） |
 | `ek_heap` | `EKCFG_HEAP_TLSF` | 核心服务 | 基于 TLSF 的内存堆管理，支持多内存池 |
 | `ek_list` | `EKCFG_LIST` | 数据结构 | Linux 内核风格双向循环链表（纯头文件，侵入式设计） |
 | `ek_vec` | `EKCFG_VEC` | 数据结构 | 类型安全动态数组（纯头文件，宏生成类型，依赖 `ek_heap`） |
-| `ek_ringbuf` | `EKCFG_RINGBUF` | 数据结构 | 通用环形缓冲区（RTOS 模式下含锁） |
+| `ek_ringbuf` | `EKCFG_RINGBUF` | 数据结构 | 通用环形缓冲区（RTOS 模式下通过锁宏支持多线程安全） |
 | `ek_ringbuf_spsc` | `EKCFG_RINGBUF_SPSC` | 数据结构 | SPSC 单生产者单消费者无锁环形缓冲区 |
 | `ek_stack` | `EKCFG_STACK` | 数据结构 | 通用 LIFO 栈 |
 | `ek_str` | `EKCFG_STR` | 数据结构 | 自动扩容的动态字符串 |
@@ -468,7 +468,7 @@ EK_IO_FPUTC()
 
 ### ek_log — 分级日志
 
-**功能概述**：多级日志输出（DEBUG/INFO/WARN/ERROR），支持 ANSI 彩色、时间戳、文件名和行号。
+**功能概述**：多级日志输出（NONE/DEBUG/INFO/WARN/ERROR/FATAL），支持 ANSI 彩色、时间戳、文件名/行号输出，以及通过 `EK_LOG_MODULE` 实现的按文件最低日志级别过滤。
 
 **源文件**：
 - `ek_utils/inc/ek_log.h`
@@ -497,17 +497,32 @@ EK_LOG_GET_TICK()
 
 **链接脚本变更**：无。
 
-**初始化**：无需显式初始化。在每个使用日志的 `.c` 文件开头使用 `EK_LOG_FILE_TAG("filename.c")` 声明文件标签。
+**初始化**：无需显式初始化。在每个使用日志的 `.c` 文件开头声明文件标签和级别。
+
+**文件声明**：有两种方式：
+- `EK_LOG_MODULE(tag, level)` — **推荐**，声明文件标签并设置该文件的最低输出级别
+- `EK_LOG_FILE_TAG(tag)` — 兼容旧接口，等价于 `EK_LOG_MODULE(tag, EK_LOG_LEVEL_NONE)`（所有级别均输出）
 
 **使用示例**：
 ```c
+// 声明文件标签，只输出 WARN 及以上级别（WARN/ERROR/FATAL）
+EK_LOG_MODULE("main.c", EK_LOG_LEVEL_WARN);
+
+// 或兼容方式：所有级别均输出
 EK_LOG_FILE_TAG("main.c");
 
-EK_LOG_DEBUG("value = %d", val);
-EK_LOG_INFO("system started");
-EK_LOG_WARN("voltage low: %dmV", mv);
-EK_LOG_ERROR("fatal: code=%d", err);
+EK_LOG_DEBUG("value = %d", val);    // DEBUG 级别（受 EKCFG_LOG_DEBUG 总开关控制）
+EK_LOG_INFO("system started");      // INFO 级别
+EK_LOG_WARN("voltage low: %dmV", mv); // WARN 级别
+EK_LOG_ERROR("fatal: code=%d", err);  // ERROR 级别
+EK_LOG_FATAL("system halted");       // FATAL 级别，输出后死循环
+EK_LOG("plain output");             // 无级别输出（级别为 NONE，受 EK_LOG_MODULE 阈值影响）
 ```
+
+**注意事项**：
+- `EK_LOG_FATAL` 输出后进入 `while(1)` 死循环，适用于不可恢复的致命错误
+- 级别过滤是编译期行为：`_EK_LOG_MIN_LEVEL_` 为当前文件的匿名枚举常量，低于该值的日志宏完全不生成代码（零运行时开销）
+- `EK_LOG(...)` 不标记级别，但同样受 `EK_LOG_MODULE` 设定的阈值影响（阈值 = `EK_LOG_LEVEL_NONE` 时始终输出）
 
 ---
 
@@ -669,7 +684,7 @@ ek_vec_destroy(v);              // 释放内存
 
 ### ek_ringbuf — 环形缓冲区
 
-**功能概述**：任意类型的环形缓冲区（通用版 `ek_ringbuf_t` + SPSC 版 `ek_ringbuf_spsc_t`），RTOS 模式下通用版含锁。
+**功能概述**：任意类型的环形缓冲区（通用版 `ek_ringbuf_t` + SPSC 版 `ek_ringbuf_spsc_t`），RTOS 模式下通用版通过锁宏支持多线程安全。
 
 **源文件**：
 - `ek_utils/inc/ek_ringbuf.h`
@@ -699,7 +714,7 @@ ek_ringbuf_spsc_t *rb_spsc = ek_ringbuf_create_spsc(sizeof(my_data_t), 11);
 ```
 
 **注意事项**：
-- 通用版在 RTOS 模式下使用 `EK_LOCKUP/EK_UNLOCK` 保护
+- 通用版在 RTOS 模式下通过 `ek_conf_internal.h` 中的锁宏保护（用户在 `ek_conf.h` 中定义映射到 RTOS mutex/semaphore）
 - SPSC 版无锁，适合 ISR→主循环 或 单生产者单消费者场景（evoke 内部使用）
 - SPSC 版满判据：`(write_idx + 1) % cap == read_idx`
 - 使用 `ek_ringbuf_destroy_safely(&rb)` 安全释放
@@ -736,7 +751,7 @@ ek_stack_destroy_safely(&sk);
 ```
 
 **注意事项**：
-- RTOS 模式下使用锁保护
+- RTOS 模式下通过锁宏保护（`EK_LOCK_TRY`/`EK_LOCK_RELEASE`，用户在 `ek_conf.h` 中定义映射）
 - 所有操作按 `item_size` 字节复制数据（值语义）
 
 ---

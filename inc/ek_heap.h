@@ -57,11 +57,11 @@ void ek_free(void *ptr);
 
 /* ========== 默认堆操作 ========== */
 
-void   ek_heap_init(void);
-void   ek_heap_destory(void);
+void ek_heap_init(void);
+void ek_heap_destory(void);
 size_t ek_heap_total_size(void);
 pool_t ek_heap_add_pool(void *ptr, size_t size);
-void   ek_heap_remove_pool(pool_t pool);
+void ek_heap_remove_pool(pool_t pool);
 size_t ek_heap_unused(void);
 size_t ek_heap_used(void);
 

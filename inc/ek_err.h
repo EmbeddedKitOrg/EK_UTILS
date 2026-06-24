@@ -35,7 +35,7 @@ typedef uint8_t ek_err_t;
 #define EK_ERR_INITED   ((ek_err_t)211) /**< 模块已初始化 */
 #define EK_ERR_NOTREADY ((ek_err_t)212) /**< 设备/模块未就绪 */
 #define EK_ERR_DISABLED ((ek_err_t)213) /**< 功能已禁用 */
-#define EK_ERR_ABORTED ((ek_err_t)214) /**< 操作被中止（资源销毁等） */
+#define EK_ERR_ABORTED  ((ek_err_t)214) /**< 操作被中止（资源销毁等） */
 
 /* ========== 数据与范围 (220-229) ========== */
 #define EK_ERR_OVERFLOW   ((ek_err_t)220) /**< 数据溢出 */
