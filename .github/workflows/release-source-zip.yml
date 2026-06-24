@@ -28,7 +28,13 @@ jobs:
             --format=zip \
             --prefix "${REPO_NAME}-${TAG_NAME}/" \
             --output "${zip_name}" \
-            "${TAG_NAME}"
+            "${TAG_NAME}" \
+            CMakeLists.txt \
+            ek_conf_template.h \
+            cmake \
+            inc \
+            src \
+            third_party
           echo "ZIP_NAME=${zip_name}" >> "$GITHUB_ENV"
 
       - name: Upload source zip to release
