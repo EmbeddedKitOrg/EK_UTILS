@@ -1,0 +1,39 @@
+name: Release Source Zip
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  upload-source-zip:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Create source zip
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          zip_name="${REPO_NAME}-${TAG_NAME}-source.zip"
+          git archive \
+            --format=zip \
+            --prefix "${REPO_NAME}-${TAG_NAME}/" \
+            --output "${zip_name}" \
+            "${TAG_NAME}"
+          echo "ZIP_NAME=${zip_name}" >> "$GITHUB_ENV"
+
+      - name: Upload source zip to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          gh release upload "${TAG_NAME}" "${ZIP_NAME}" --clobber
