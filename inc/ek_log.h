@@ -47,13 +47,43 @@
 #    endif /* EKCFG_LOG_BUF_SIZE     */
 
 /**
- * @brief 定义文件标签
+ * @brief 日志级别枚举
+ */
+typedef enum
+{
+    EK_LOG_LEVEL_NONE = 0, /**< 无级别（普通输出） */
+    EK_LOG_LEVEL_DEBUG, /**< 调试信息 */
+    EK_LOG_LEVEL_INFO, /**< 一般信息 */
+    EK_LOG_LEVEL_WARN, /**< 警告信息 */
+    EK_LOG_LEVEL_ERROR, /**< 错误信息 */
+    EK_LOG_LEVEL_FATAL, /**< 致命错误信息 */
+
+    EK_LOG_LEVEL_MAX, /**< 最大级别数 */
+} ek_log_level_t;
+
+/**
+ * @brief 定义文件标签和最小日志等级
  * @param tag 标签字符串
+ * @param level 最低日志等级
  * @note 在源文件开头使用，用于标识日志来源
  * @example
  * EK_LOG_FILE_TAG("main.c");
  */
-#    define EK_LOG_FILE_TAG(tag) static const char *_EK_LOG_TAG_ = (tag);
+#    define EK_LOG_MODULE(tag, level)            \
+        static const char *_EK_LOG_TAG_ = (tag); \
+        enum                                     \
+        {                                        \
+            _EK_LOG_MIN_LEVEL_ = (level)         \
+        }
+
+/**
+ * @brief 定义文件标签并且默认日志全部输出
+ * @param tag 标签字符串
+ * @note 用于兼容旧的接口
+ * @example
+ * EK_LOG_FILE_TAG("main.c");
+ */
+#    define EK_LOG_FILE_TAG(tag) EK_LOG_MODULE(tag, EK_LOG_LEVEL_NONE)
 
 /**
  * @brief 定义获取时间戳函数
@@ -65,20 +95,6 @@
  * }
  */
 #    define EK_LOG_GET_TICK() uint32_t _ek_log_get_tick(void)
-
-/**
- * @brief 日志级别枚举
- */
-typedef enum
-{
-    EK_LOG_TYPE_NONE = 0, /**< 无级别（普通输出） */
-    EK_LOG_TYPE_DEBUG, /**< 调试信息 */
-    EK_LOG_TYPE_INFO, /**< 一般信息 */
-    EK_LOG_TYPE_WARN, /**< 警告信息 */
-    EK_LOG_TYPE_ERROR, /**< 错误信息 */
-
-    EK_LOG_TYPE_MAX = 5, /**< 最大级别数 */
-} ek_log_type_t;
 
 #    ifdef __cplusplus
 extern "C"
@@ -94,7 +110,7 @@ extern "C"
  * @param fmt 格式化字符串
  * @param ... 可变参数
  */
-void _ek_log_printf(const char *tag, uint32_t line, ek_log_type_t type, uint32_t tick, const char *fmt, ...);
+void _ek_log_printf(const char *tag, uint32_t line, ek_log_level_t type, uint32_t tick, const char *fmt, ...);
 
 /**
  * @brief 获取系统时间戳（用户实现）
@@ -108,8 +124,9 @@ uint32_t _ek_log_get_tick(void);
  * @note 仅在 EKCFG_LOG_DEBUG == 1 时有效
  */
 #    if (EKCFG_LOG_DEBUG == 1)
-#        define EK_LOG_DEBUG(...) \
-            _ek_log_printf(_EK_LOG_TAG_, __LINE__, EK_LOG_TYPE_DEBUG, _ek_log_get_tick(), __VA_ARGS__)
+#        define EK_LOG_DEBUG(...)                         \
+            if (_EK_LOG_MIN_LEVEL_ <= EK_LOG_LEVEL_DEBUG) \
+            _ek_log_printf(_EK_LOG_TAG_, __LINE__, EK_LOG_LEVEL_DEBUG, _ek_log_get_tick(), __VA_ARGS__)
 #    else
 #        define EK_LOG_DEBUG(...)
 #    endif
@@ -118,26 +135,43 @@ uint32_t _ek_log_get_tick(void);
  * @brief 普通日志（无级别标识）
  * @param ... 格式化字符串和参数
  */
-#    define EK_LOG(...) _ek_log_printf(_EK_LOG_TAG_, __LINE__, EK_LOG_TYPE_NONE, _ek_log_get_tick(), __VA_ARGS__)
+#    define EK_LOG(...)                              \
+        if (_EK_LOG_MIN_LEVEL_ <= EK_LOG_LEVEL_NONE) \
+        _ek_log_printf(_EK_LOG_TAG_, __LINE__, EK_LOG_LEVEL_NONE, _ek_log_get_tick(), __VA_ARGS__)
 
 /**
  * @brief INFO 级别日志
  * @param ... 格式化字符串和参数
  */
-#    define EK_LOG_INFO(...) _ek_log_printf(_EK_LOG_TAG_, __LINE__, EK_LOG_TYPE_INFO, _ek_log_get_tick(), __VA_ARGS__)
+#    define EK_LOG_INFO(...)                         \
+        if (_EK_LOG_MIN_LEVEL_ <= EK_LOG_LEVEL_INFO) \
+        _ek_log_printf(_EK_LOG_TAG_, __LINE__, EK_LOG_LEVEL_INFO, _ek_log_get_tick(), __VA_ARGS__)
 
 /**
  * @brief WARN 级别日志
  * @param ... 格式化字符串和参数
  */
-#    define EK_LOG_WARN(...) _ek_log_printf(_EK_LOG_TAG_, __LINE__, EK_LOG_TYPE_WARN, _ek_log_get_tick(), __VA_ARGS__)
+#    define EK_LOG_WARN(...)                         \
+        if (_EK_LOG_MIN_LEVEL_ <= EK_LOG_LEVEL_WARN) \
+        _ek_log_printf(_EK_LOG_TAG_, __LINE__, EK_LOG_LEVEL_WARN, _ek_log_get_tick(), __VA_ARGS__)
 
 /**
  * @brief ERROR 级别日志
  * @param ... 格式化字符串和参数
  */
-#    define EK_LOG_ERROR(...) _ek_log_printf(_EK_LOG_TAG_, __LINE__, EK_LOG_TYPE_ERROR, _ek_log_get_tick(), __VA_ARGS__)
-
+#    define EK_LOG_ERROR(...)                         \
+        if (_EK_LOG_MIN_LEVEL_ <= EK_LOG_LEVEL_ERROR) \
+        _ek_log_printf(_EK_LOG_TAG_, __LINE__, EK_LOG_LEVEL_ERROR, _ek_log_get_tick(), __VA_ARGS__)
+/**
+ * @brief FATAL 级别日志
+ * @param ... 格式化字符串和参数
+ */
+#    define EK_LOG_FATAL(...)                                                                            \
+        if (_EK_LOG_MIN_LEVEL_ <= EK_LOG_LEVEL_FATAL)                                                    \
+        {                                                                                                \
+            _ek_log_printf(_EK_LOG_TAG_, __LINE__, EK_LOG_LEVEL_FATAL, _ek_log_get_tick(), __VA_ARGS__); \
+            while (1);                                                                                   \
+        }
 #    ifdef __cplusplus
 }
 #    endif
