@@ -4,9 +4,11 @@
  * 使用方法:
  *   1. 将此文件复制到你的项目 include 路径中，命名为 ek_conf.h
  *   2. 按需修改各宏的值（不修改的宏自动取默认值）
- *   3. 确保 ek_conf.h 能被编译器找到：
- *      - CMake 方式：cmake -DEK_CONF_PATH="Core/Inc/ek_conf.h"
- *      - include 优先级：你的 Inc/ 路径优先于 ek_utils/inc/
+ *   3. 确保 ek_conf.h 能被编译器找到（两种方式，详见 README）：
+ *      - CMake 传参：cmake -DEK_CONF_PATH="Core/Inc/ek_conf.h"
+ *      - include 路径：把存放本文件的目录加给 ek_utils 对象库
+ *        （target_include_directories(ek_utils PUBLIC Core/Inc)）；
+ *        注意仅给主 target 设 PRIVATE 不会传播给子项目 ek_utils。
  */
 
 #ifndef EK_CONF_H

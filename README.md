@@ -98,14 +98,20 @@ git submodule add https://github.com/N1netyNine99/ek_utils.git lib/ek_utils
 CMakeLists.txt 配置：
 
 ```cmake
-# 1. 你的 include 路径在前（确保 ek_conf.h 优先被找到）
+# 1. 引入 ek_utils 对象库
+add_subdirectory(lib/ek_utils)
+
+# 2. 关键：让 ek_utils 也能搜索到存放 ek_conf.h 的目录
+#    ek_utils 是 OBJECT 库，编译自己的 .c 时会 #include "ek_conf.h"，
+#    因此必须把存放 ek_conf.h 的目录加给 ek_utils，而不仅是主 target。
+#    （给主 target 设 PRIVATE include 不会传播给子项目 ek_utils。）
+target_include_directories(ek_utils PUBLIC Core/Inc)
 target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)
 
-# 2. 引入 ek_utils 对象库
-add_subdirectory(lib/ek_utils)
+# 3. 链接对象库
 target_link_libraries(${PROJECT_NAME} $<TARGET_OBJECTS:ek_utils>)
 
-# 3. 可选：通过 EK_CONF_PATH 显式指定 ek_conf.h 位置
+# 4. 可选：通过 EK_CONF_PATH 显式指定 ek_conf.h 位置（见下文"配置说明"）
 #    cmake -DEK_CONF_PATH="Core/Inc/ek_conf.h" ...
 ```
 
@@ -133,28 +139,50 @@ ek_utils 不内置默认配置文件。**用户必须创建自己的 `ek_conf.h`
 
 1. 复制仓库根目录的 `ek_conf_template.h` → 你的项目 include 路径，改名为 `ek_conf.h`
 2. 按硬件调整宏值（不需要改的可以删掉，未定义的宏自动取默认值）
-3. 确保编译器能找到你的 `ek_conf.h`
+3. 确保编译器能找到你的 `ek_conf.h`（见下文两种方式）
 
 ### 指定配置文件的两种方式
 
-**方式 A：CMake 传参（推荐）**
+> **原理与关键约束**：ek_utils 的源文件通过 `ek_conf_internal.h` 引入配置，逻辑为：
+> ```c
+> #ifdef EK_CONF_PATH
+> #    include EK_CONF_PATH   // 方式 A：CMake 传入的路径
+> #else
+> #    include "ek_conf.h"    // 方式 B：标准 include 搜索
+> #endif
+> ```
+> ek_utils 是 **OBJECT 库**，编译自己的 `.c` 时会执行上述 `#include`，因此存放
+> `ek_conf.h` 的目录必须出现在 **ek_utils 的 include 搜索路径**中——仅给主 target
+> 设 `PRIVATE` include 目录**不会**传播给被 `add_subdirectory` 的子项目 ek_utils。
+
+**方式 A：CMake 传参（推荐，最省心）**
 
 ```bash
 cmake -DEK_CONF_PATH="Core/Inc/ek_conf.h" -B build
 ```
 
-CMakeLists.txt 中的 `target_compile_definitions` 会自动把路径传给编译器，
-`ek_conf_internal.h` 会 `#include` 指定路径。
+CMakeLists.txt 中的 `target_compile_definitions` 会把 `EK_CONF_PATH` 作为编译宏传给
+编译器，`ek_conf_internal.h` 通过 `#include EK_CONF_PATH` 直接展开为该路径。
 
-**方式 B：include 优先级**
+> 路径可为绝对路径，或相对于某个 `-I` 目录的相对路径；用相对路径时仍需保证
+> 存放目录可被搜索到（见方式 B 的 include 设置）。
 
-确保你的 `ek_conf.h` 所在目录在 include 搜索路径中优先于 `ek_utils/inc/`。
-在 CMake 中，`target_include_directories` 写在 `add_subdirectory` 之前的路径优先级更高。
+**方式 B：include 搜索路径**
+
+不传 `EK_CONF_PATH` 时走标准 `#include "ek_conf.h"` 搜索，需把存放 `ek_conf.h`
+的目录加入 ek_utils 的 include 搜索路径：
 
 ```cmake
-target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)  # 在前 → 优先
 add_subdirectory(lib/ek_utils)
+# 让 ek_utils 编译 .c 时也能找到你的 ek_conf.h
+target_include_directories(ek_utils PUBLIC Core/Inc)
+target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)
 ```
+
+> 无需担心"优先级"：`ek_utils/inc/` 中没有同名 `ek_conf.h`（只有
+> `ek_conf_internal.h` 和 `ek_conf_template.h`），不会冲突。
+> 旧文档称"把 `target_include_directories` 写在 `add_subdirectory` 之前可提高优先级"——
+> 该说法对 OBJECT 库 + PRIVATE 不成立，PRIVATE 不会传播给子项目。
 
 ### 配置宏完整列表
 
