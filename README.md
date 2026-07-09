@@ -262,6 +262,9 @@ void ek_evoke_set_timer(uint32_t xtick)  // 设置单次定时器
 void ek_evoke_light_sleep(void)          // 浅睡眠（WFI）
 void ek_evoke_deep_sleep(void)           // 深度睡眠（低功耗模式）
 
+// ========== ek_assert — 断言失败钩子（仅 full 模式）==========
+void ek_assert_hook(const char *file, uint32_t line, const char *expr)  // 断言失败时调用（死循环前）
+
 // ========== ek_heap — 自定义分配器（仅在 EKCFG_HEAP_TLSF=0 时）==========
 void *ek_malloc(size_t size)
 void ek_free(void *ptr)
@@ -350,7 +353,7 @@ ek_stack_destroy_safely(sk);            // sk 释放后自动 = NULL
 |3|ek_conf_internal|基础层|用户创建 `ek_conf.h` 即可|
 |4|ek_io|核心服务|实现 `_ek_io_fputc()` — 单字符输出|
 |5|ek_log|核心服务|实现 `_ek_log_get_tick()` — 系统时间戳|
-|6|ek_assert|核心服务|tiny 模式零移植；full 模式依赖 `ek_log`|
+|6|ek_assert|核心服务|tiny 模式零移植；full 模式依赖 `ek_log`，可选覆盖 `ek_assert_hook`|
 |7|ek_heap|核心服务|决定堆段位置（`EKCFG_HEAP_SECTION`）|
 |8|ek_list|数据结构|零移植，纯头文件|
 |9|ek_vec|数据结构|纯头文件，依赖 `ek_heap`|
@@ -573,7 +576,7 @@ EK_LOG("plain output");             // 无级别输出（级别为 NONE，受 EK
 | `EKCFG_ASSERT_TINY` | 1 | 使用轻量级断言（死循环）；0=full 模式 |
 | `EKCFG_ASSERT_LOG` | 1 | 断言失败时输出日志（需要 EKCFG_LOG） |
 
-**用户需实现的接口**：无 — `ek_assert_fault()` 有默认弱实现（输出信息后死循环）。
+**用户需实现的接口**：无强制项。`ek_assert_fault()` 有默认实现（输出信息后死循环）。可选覆盖 `ek_assert_hook()` 弱函数——它在日志输出后、死循环前被调用，用于插入自定义处理（记录到 flash、触发复位等）。
 
 **链接脚本变更**：无。
 
@@ -583,6 +586,7 @@ EK_LOG("plain output");             // 无级别输出（级别为 NONE，受 EK
 - tiny 模式（默认）：断言失败直接 `while(1)` 死循环，零 RAM/ROM 开销
 - full 模式：会调用 `ek_assert_fault()`，可覆盖此函数实现自定义处理（如复位芯片）
 - 所有 ek_utils 内部函数参数检查均使用 `ek_assert_param`
+- full 模式下，`ek_assert_fault` 在死循环前会调用 `__EK_WEAK void ek_assert_hook(file, line, expr)`（默认空实现）；用户可提供同名强函数覆盖，插入自定义逻辑。注意：hook 返回后仍进入死循环，如需复位须在 hook 内直接触发
 
 ---
 

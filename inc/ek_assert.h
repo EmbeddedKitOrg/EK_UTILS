@@ -75,6 +75,17 @@ extern "C"
  */
 void ek_assert_fault(const char *file, uint32_t line, const char *expr);
 
+/**
+ * @brief 断言失败钩子函数（弱函数）
+ * @param file 源文件名
+ * @param line 行号
+ * @param expr 断言表达式字符串
+ * @note 在 ek_assert_fault 输出日志后、进入死循环前调用
+ *       用户可覆盖此函数实现自定义处理（如记录到 flash、触发复位）
+ * @warning 此函数返回后仍会进入 while(1) 死循环；如需复位，须在钩子内直接触发
+ */
+void ek_assert_hook(const char *file, uint32_t line, const char *expr);
+
 #    ifdef __cplusplus
 }
 #    endif
