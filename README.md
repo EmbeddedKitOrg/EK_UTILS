@@ -23,7 +23,7 @@ ek_utils/
 │   ├── ek_err.h                   # 错误码定义（ek_err_t）和错误处理宏
 │   ├── ek_assert.h                # 断言模块
 │   ├── ek_log.h                   # 分级日志模块
-│   ├── ek_io.h                    # IO 输出封装（lwprintf / picolibc / 空实现）
+│   ├── ek_io.h                    # IO 输出封装（lwprintf / picolibc / 标准 libc 直通）
 │   ├── ek_heap.h                  # 内存堆管理（基于 TLSF）
 │   ├── ek_list.h                  # 双向循环链表（纯头文件）
 │   ├── ek_vec.h                   # 类型安全动态数组（纯头文件，宏生成类型）
@@ -58,7 +58,7 @@ ek_utils/
 |------|--------|------|------|
 | `ek_err` | 始终包含 | 基础层 | 错误码体系（`ek_err_t`），含 45+ 错误码和错误传播宏 |
 | `ek_def` | 始终包含 | 基础层 | 跨编译器兼容层（`__EK_WEAK`/`__EK_PACKED`/`__EK_INLINE` 等） |
-| `ek_io` | `EKCFG_IO_LWPRTF` / `EKCFG_PICOLIBC` | 核心服务 | IO 输出封装，支持 lwprintf 或 picolibc 两种后端 |
+| `ek_io` | `EKCFG_IO_LWPRTF` / `EKCFG_PICOLIBC` | 核心服务 | IO 输出封装，支持 lwprintf / picolibc / 标准 libc 三种后端 |
 | `ek_log` | `EKCFG_LOG` | 核心服务 | 分级日志（NONE/DEBUG/INFO/WARN/ERROR/FATAL），支持 ANSI 彩色、时间戳和按文件级别过滤 |
 | `ek_assert` | `EKCFG_ASSERT` | 核心服务 | 断言：tiny 模式（死循环）和 full 模式（输出详情） |
 | `ek_heap` | `EKCFG_HEAP_TLSF` | 核心服务 | 基于 TLSF 的内存堆管理，支持多内存池 |
@@ -92,28 +92,30 @@ ek_utils/
 
 ```bash
 # 在你的 MCU 项目根目录
-git submodule add https://github.com/N1netyNine99/ek_utils.git lib/ek_utils
+git submodule add https://github.com/EmbeddedKitOrg/EK_UTILS.git lib/ek_utils
 ```
 
-CMakeLists.txt 配置：
+CMakeLists.txt 配置（CMake ≥ 3.12，推荐 3.20+）：
 
 ```cmake
-# 1. 引入 ek_utils 对象库
+# 1.（推荐）通过 EK_CONF_PATH 显式指定 ek_conf.h 位置。
+#    必须用绝对路径：ek_conf_internal.h 里是 #include EK_CONF_PATH（引号形式），
+#    相对路径会先按 ek_utils/inc/ 目录解析，容易落空。
+set(EK_CONF_PATH "${CMAKE_CURRENT_SOURCE_DIR}/Core/Inc/ek_conf.h"
+    CACHE FILEPATH "" FORCE)
+
+# 2. 引入 ek_utils 对象库
 add_subdirectory(lib/ek_utils)
 
-# 2. 关键：让 ek_utils 也能搜索到存放 ek_conf.h 的目录
-#    ek_utils 是 OBJECT 库，编译自己的 .c 时会 #include "ek_conf.h"，
-#    因此必须把存放 ek_conf.h 的目录加给 ek_utils，而不仅是主 target。
-#    （给主 target 设 PRIVATE include 不会传播给子项目 ek_utils。）
-target_include_directories(ek_utils PUBLIC Core/Inc)
-target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)
-
-# 3. 链接对象库
-target_link_libraries(${PROJECT_NAME} $<TARGET_OBJECTS:ek_utils>)
-
-# 4. 可选：通过 EK_CONF_PATH 显式指定 ek_conf.h 位置（见下文"配置说明"）
-#    cmake -DEK_CONF_PATH="Core/Inc/ek_conf.h" ...
+# 3. 链接对象库 — CMake 3.12+ 允许直接链接 OBJECT 库：
+#    ek_utils 的 PUBLIC include（inc/、third_party/tlsf、third_party/lwprintf/inc）
+#    会自动传播给主工程，主工程无需再手动加 ek_utils/inc 等路径。
+#    （旧的 $<TARGET_OBJECTS:ek_utils> 写法只搬对象文件、不带接口，不推荐。）
+target_link_libraries(${PROJECT_NAME} ek_utils)
 ```
+
+> 不传 `EK_CONF_PATH` 也可以：把存放 `ek_conf.h` 的目录加进 ek_utils 的 include
+> 搜索路径即可（见下文"配置说明 · 方式 B"）。
 
 ### 方式二：源文件直接集成
 
@@ -155,17 +157,29 @@ ek_utils 不内置默认配置文件。**用户必须创建自己的 `ek_conf.h`
 > `ek_conf.h` 的目录必须出现在 **ek_utils 的 include 搜索路径**中——仅给主 target
 > 设 `PRIVATE` include 目录**不会**传播给被 `add_subdirectory` 的子项目 ek_utils。
 
-**方式 A：CMake 传参（推荐，最省心）**
+**方式 A：`EK_CONF_PATH` 编译宏（推荐，最省心）**
 
-```bash
-cmake -DEK_CONF_PATH="Core/Inc/ek_conf.h" -B build
+推荐在项目 CMakeLists.txt 中设置（可复现，需在 `add_subdirectory` 之前）：
+
+```cmake
+set(EK_CONF_PATH "${CMAKE_CURRENT_SOURCE_DIR}/Core/Inc/ek_conf.h"
+    CACHE FILEPATH "" FORCE)
+add_subdirectory(lib/ek_utils)
 ```
 
-CMakeLists.txt 中的 `target_compile_definitions` 会把 `EK_CONF_PATH` 作为编译宏传给
-编译器，`ek_conf_internal.h` 通过 `#include EK_CONF_PATH` 直接展开为该路径。
+也可在命令行传入：
 
-> 路径可为绝对路径，或相对于某个 `-I` 目录的相对路径；用相对路径时仍需保证
-> 存放目录可被搜索到（见方式 B 的 include 设置）。
+```bash
+cmake -DEK_CONF_PATH="$(pwd)/Core/Inc/ek_conf.h" -B build
+```
+
+ek_utils 的 CMakeLists 会把 `EK_CONF_PATH` 作为编译宏传给编译器
+（`target_compile_definitions`），`ek_conf_internal.h` 通过 `#include EK_CONF_PATH`
+直接展开为该路径。
+
+> **必须使用绝对路径**。`#include EK_CONF_PATH` 展开后是引号形式
+> `#include "..."`，相对路径会先按包含它的文件所在目录（`ek_utils/inc/`）
+> 解析，再按 `-I` 搜索，容易落空；绝对路径最稳妥。
 
 **方式 B：include 搜索路径**
 
@@ -177,6 +191,7 @@ add_subdirectory(lib/ek_utils)
 # 让 ek_utils 编译 .c 时也能找到你的 ek_conf.h
 target_include_directories(ek_utils PUBLIC Core/Inc)
 target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)
+# 链接：target_link_libraries(${PROJECT_NAME} ek_utils)（见方式一）
 ```
 
 > 无需担心"优先级"：`ek_utils/inc/` 中没有同名 `ek_conf.h`（只有
@@ -187,10 +202,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)
 ### 配置宏完整列表
 
 ```c
-// 平台/运行环境
+// 平台/运行环境（IO 后端三选一，详见"IO 后端选择"）
 #define EKCFG_RTOS      (0)     // 是否使用 RTOS
-#define EKCFG_PICOLIBC  (1)     // 是否使用 picolibc（自动关闭 lwprintf）
-#define EKCFG_IO_LWPRTF (0)     // IO 是否使用 lwprintf
+#define EKCFG_PICOLIBC  (1)     // 是否使用 picolibc（内部默认 1；模板默认 0。=1 时自动关闭 lwprintf）
+#define EKCFG_IO_LWPRTF (0)     // IO 是否使用 lwprintf（内部默认 0；模板默认 1。两者均 0 时需在 ek_conf.h 自行定义 ek_printf 宏）
 
 // 核心服务（1=启用，0=禁用）
 #define EKCFG_EXPORT (0)
@@ -223,12 +238,36 @@ target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)
 #define EKCFG_EVOKE_MIN_DEEPSLEEP_TICK (10)          // 进入深度睡眠最小 tick
 ```
 
-### picolibc vs lwprintf
+### IO 后端选择（三种方式）
 
-| 场景 | 配置 | 说明 |
-|------|------|------|
-| 标准 IO (picolibc) | `EKCFG_PICOLIBC=1` | ek_printf → printf，ek_malloc → picolibc malloc |
-| 轻量 IO (lwprintf) | `EKCFG_IO_LWPRTF=1, EKCFG_PICOLIBC=0` | ek_printf → lwprintf，适合没有完整 libc 的环境 |
+`ek_io.h` 按以下优先级选择后端：`EKCFG_IO_LWPRTF=1` → lwprintf；否则 `EKCFG_PICOLIBC=1` → picolibc；两者均为 0 → 标准 libc 直通（需用户定义宏）。
+
+| 后端 | ek_conf.h 配置 | `ek_printf` 等宏 | 需实现 | 适用场景 |
+|------|---------------|------------------|--------|----------|
+| picolibc（内部默认） | `EKCFG_PICOLIBC=1` | 自动 → `printf`/`vsnprintf` 等 stdio | `int _ek_io_fputc(int ch)` | 无完整 libc 的 MCU，picolibc 预编译库 + stdout/malloc 已接管 |
+| lwprintf（模板默认） | `EKCFG_IO_LWPRTF=1, EKCFG_PICOLIBC=0` | 自动 → `lwprintf`/`lwvsnprintf` 等 | `void _ek_io_fputc(int ch)` | 极简 IO，自带轻量格式化，不依赖 libc |
+| 标准 libc stdio 直通 | `EKCFG_PICOLIBC=0, EKCFG_IO_LWPRTF=0` | **需在 ek_conf.h 中自行定义** | 无（直接用 libc） | 已有完整 libc（桌面/新libc/RTOS 提供 stdio），直接使用系统 printf |
+
+**方式三（标准 libc stdio 直通）**：`ek_io.h` 在两者均为 0 时不定义
+`ek_printf`/`ek_vsnprintf` 等宏，需在 `ek_conf.h` 中补全：
+
+```c
+#define EKCFG_PICOLIBC  (0)   /* 不使用 picolibc */
+#define EKCFG_IO_LWPRTF (0)   /* 不使用 lwprintf */
+
+#include <stdio.h>
+
+#define ek_printf    printf
+#define ek_vprintf   vprintf
+#define ek_sprintf   sprintf
+#define ek_snprintf  snprintf
+#define ek_vsnprintf vsnprintf
+```
+
+> 核心约束：只要 `EKCFG_IO_LWPRTF=0` 且 `EKCFG_PICOLIBC=0`，用到 `ek_printf` 的模块
+> （`ek_log`、`ek_str`）编译时就需要上述宏，**必须**由用户在 `ek_conf.h` 中补全，
+> 否则编译报错（`ek_io.h` 源码注释："如果不需要使用 lwprintf 需要补全下列的宏"）。
+> `EKCFG_PICOLIBC=1` 时 `EKCFG_IO_LWPRTF` 会被强制置 0（ek_conf_internal 自动处理）。
 
 ### 原理解释
 
@@ -250,6 +289,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)
 
 ```c
 // ========== ek_io — 字符输出 ==========
+// lwprintf 后端：void _ek_io_fputc(int ch)；picolibc 后端：int _ek_io_fputc(int ch)
+// 标准 libc 直通（EKCFG_PICOLIBC=0 且 EKCFG_IO_LWPRTF=0）时无需实现
 void _ek_io_fputc(int ch)               // 字符输出（UART 等）
 
 // ========== ek_log — 时间戳 ==========
@@ -351,7 +392,7 @@ ek_stack_destroy_safely(sk);            // sk 释放后自动 = NULL
 |1|ek_err|基础层|零移植，纯头文件|
 |2|ek_def|基础层|零移植，编译器自动适配|
 |3|ek_conf_internal|基础层|用户创建 `ek_conf.h` 即可|
-|4|ek_io|核心服务|实现 `_ek_io_fputc()` — 单字符输出|
+|4|ek_io|核心服务|实现 `_ek_io_fputc()`（lwprintf/picolibc 后端）；标准 libc 直通无需实现|
 |5|ek_log|核心服务|实现 `_ek_log_get_tick()` — 系统时间戳|
 |6|ek_assert|核心服务|tiny 模式零移植；full 模式依赖 `ek_log`，可选覆盖 `ek_assert_hook`|
 |7|ek_heap|核心服务|决定堆段位置（`EKCFG_HEAP_SECTION`）|
@@ -452,12 +493,13 @@ const char *msg = ek_strerror(EK_ERR_TIMEOUT); // "Timeout"
 - **用户必须创建 `ek_conf.h`**，否则 `ek_conf_internal.h` 中的 `#include "ek_conf.h"` 会编译失败
 - 复制 `ek_utils/ek_conf_template.h` 改名为 `ek_conf.h`，仅保留需要覆盖的宏即可
 - 依赖校验规则：`picolibc=1` 自动关闭 lwprintf；`evoke=1` 且 `RTOS=1` 编译报错；sem/msg 开启但 picothread 未开时报错
+- IO 后端规则：`EKCFG_PICOLIBC=1`（内部默认）走 picolibc；`EKCFG_IO_LWPRTF=1` 走 lwprintf；两者均为 0 时 `ek_printf` 等宏未定义，**必须在 `ek_conf.h` 中自行补全**（标准 libc 直通，见"IO 后端选择"）
 
 ---
 
 ### ek_io — IO 输出封装
 
-**功能概述**：封装底层 printf 输出，支持 lwprintf 和 picolibc 两种后端，提供统一的 `ek_printf` 宏。
+**功能概述**：封装底层 printf 输出，支持 lwprintf、picolibc、标准 libc 三种后端，提供统一的 `ek_printf` 宏。后端选择见上文"IO 后端选择（三种方式）"。
 
 **源文件**：
 - `ek_utils/inc/ek_io.h`
@@ -475,9 +517,11 @@ const char *msg = ek_strerror(EK_ERR_TIMEOUT); // "Timeout"
 |----|--------|------|
 | `EKCFG_IO_LWPRTF` | 0 | 使用 lwprintf 后端（与 PICOLIBC 互斥） |
 | `EKCFG_PICOLIBC` | 1 | 使用 picolibc 后端（优先级高于 LWPRTF） |
+| （两者均为 0） | — | 标准 libc 直通：`ek_printf` 等宏**未定义**，需在 `ek_conf.h` 中自行定义 |
 
 **用户需实现的接口**：
-- `int _ek_io_fputc(int ch)` — 底层单字符输出（UART 发送等）
+- lwprintf / picolibc 后端：`_ek_io_fputc(int ch)` — 底层单字符输出（UART 发送等）
+- 标准 libc 直通：无需实现（直接用 libc 的 stdio）
 
 ```c
 EK_IO_FPUTC()
@@ -494,6 +538,8 @@ EK_IO_FPUTC()
 **注意事项**：
 - `EKCFG_PICOLIBC=1` 时 `EKCFG_IO_LWPRTF` 被强制设为 0（ek_conf_internal 自动处理）
 - picolibc 模式下 `_ek_io_fputc` 返回 `int` 类型（`EOF` 表示错误）；lwprintf 模式下返回 `void`
+- 标准 libc 直通（两者均为 0）：`ek_printf`/`ek_vsnprintf` 等宏未定义，必须在 `ek_conf.h` 中补全（参见"IO 后端选择"），且 `EK_IO_FPUTC()` 展开为空、`ek_io_init()` 为空函数
+- picolibc 模式下 `ek_picolibc_port.c` 会额外接管：`stdout`/`stderr` 重定向到 `_ek_io_fputc`，`malloc`/`free`/`realloc` 与 TLSF 堆互连（`EKCFG_HEAP_TLSF=1` 时 libc 分配走 ek_malloc，反之 ek_malloc 走 libc）
 
 ---
 
@@ -806,7 +852,7 @@ ek_stack_destroy_safely(&sk);
 |----|--------|------|
 | `EKCFG_STR` | 0 | 模块开关 |
 
-**用户需实现的接口**：无（间接依赖 `ek_io`，需实现 `_ek_io_fputc` 以支持格式化整数输出）。
+**用户需实现的接口**：无直接接口。`ek_str_append_fmt` 间接依赖 `ek_io` 的 `ek_vsnprintf`；是否需要实现 `_ek_io_fputc` 取决于 IO 后端选择（lwprintf/picolibc 需实现；标准 libc 直通无需，见"IO 后端选择"）。
 
 **链接脚本变更**：无。
 
