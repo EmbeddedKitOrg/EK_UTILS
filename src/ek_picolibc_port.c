@@ -6,7 +6,7 @@
  * 统一 picolibc 与 ek_utils 的内存分配器和字符输出：
  * - A (EKCFG_HEAP_TLSF=1): picolibc 的 malloc/free/realloc → ek_malloc/ek_free/ek_realloc (TLSF)
  * - B (EKCFG_HEAP_TLSF=0): ek_malloc/ek_free/ek_realloc → picolibc 的 malloc/free/realloc
- * - stdout: putchar → _ek_io_fputc
+ * - stdout: putchar → ek_port_io_fputc
  */
 
 #include "ek_conf_internal.h"
@@ -52,11 +52,17 @@ void *ek_realloc(void *ptr, size_t size)
 
 #    endif /* EKCFG_HEAP_TLSF */
 
-static int _ek_picolibc_putc(char c, FILE *file)
+static int _ek_picolibc_putc(char ch, FILE *file)
 {
     __EK_UNUSED(file);
-    return _ek_io_fputc(c);
+    return ek_port_io_fputc(ch);
 }
+
+
+static FILE __stdio = FDEV_SETUP_STREAM(_ek_picolibc_putc, NULL, NULL, _FDEV_SETUP_WRITE);
+
+FILE *const stdout = &__stdio;
+FILE *const stderr = &__stdio;
 
 void _exit(int status)
 {
@@ -65,10 +71,5 @@ void _exit(int status)
     {
     }
 }
-
-static FILE __stdio = FDEV_SETUP_STREAM(_ek_picolibc_putc, NULL, NULL, _FDEV_SETUP_WRITE);
-
-FILE *const stdout = &__stdio;
-FILE *const stderr = &__stdio;
 
 #endif /* EKCFG_PICOLIBC */

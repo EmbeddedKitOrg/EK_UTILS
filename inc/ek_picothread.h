@@ -12,7 +12,7 @@
 /**
  * @brief 信号量结构体前向声明
  */
-typedef struct ek_pt_sem_t ek_pt_sem_t;
+typedef struct ek_pt_sem ek_pt_sem_t;
 
 /**
  * @brief 信号量句柄
@@ -22,7 +22,7 @@ typedef ek_pt_sem_t *ek_pt_sem_handle_t;
 /**
  * @brief 信号量结构体
  */
-struct ek_pt_sem_t
+struct ek_pt_sem
 {
     uint8_t count; // 可用计数
     ek_list_node_t wait_list; // 等待队列
@@ -35,7 +35,7 @@ struct ek_pt_sem_t
 /**
  * @brief 消息队列结构体前向声明
  */
-typedef struct ek_pt_msg_t ek_pt_msg_t;
+typedef struct ek_pt_msg ek_pt_msg_t;
 
 /**
  * @brief 消息队列句柄
@@ -47,7 +47,7 @@ typedef ek_pt_msg_t *ek_pt_msg_handle_t;
  *
  * 内部复用 ek_ringbuf_t 存储消息数据，recv_wait/send_wait 负责任务同步。
  */
-struct ek_pt_msg_t
+struct ek_pt_msg
 {
     ek_ringbuf_t *rb; // 消息缓冲区
     ek_list_node_t recv_wait; // 接收等待队列（缓冲区空时阻塞）
@@ -58,7 +58,7 @@ struct ek_pt_msg_t
 /**
  * @brief 协作式微线程（protothread）结构体前向声明
  */
-typedef struct ek_pt_t ek_pt_t;
+typedef struct ek_pt ek_pt_t;
 
 /**
  * @brief 微线程句柄，指向 ek_pt_t 的指针
@@ -91,7 +91,7 @@ typedef enum
 /**
  * @brief 微线程结构体
  */
-struct ek_pt_t
+struct ek_pt
 {
     const char *name; // 任务名称
     uint8_t prio; // 优先级（数值越小优先级越高）

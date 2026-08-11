@@ -38,12 +38,12 @@
 /**
  * @brief 任务结构体（前置声明）
  */
-typedef struct ek_evoke_task_t ek_evoke_task_t;
+typedef struct ek_evoke_task ek_evoke_task_t;
 
 /**
  * @brief 事件结构体（前置声明）
  */
-typedef struct ek_evoke_event_t ek_evoke_event_t;
+typedef struct ek_evoke_event ek_evoke_event_t;
 
 /**
  * @brief 任务句柄类型
@@ -79,7 +79,7 @@ typedef enum
 /**
  * @brief 任务结构体
  */
-struct ek_evoke_task_t
+struct ek_evoke_task
 {
     ek_evoke_state_t state; /**< 任务状态 */
     ek_list_node_t node; /**< 链表节点 */
@@ -92,7 +92,7 @@ struct ek_evoke_task_t
 /**
  * @brief 事件结构体
  */
-struct ek_evoke_event_t
+struct ek_evoke_event
 {
     ek_list_node_t wait_list; /**< 等待该事件的任务链表 */
     const char *name; /**< 事件名称 */

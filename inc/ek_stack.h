@@ -27,9 +27,9 @@
  *
  * 封装了栈的基本属性，包括缓冲区指针、栈顶指针、元素大小和容量。
  */
-typedef struct ek_stack_t ek_stack_t;
+typedef struct ek_stack ek_stack_t;
 
-struct ek_stack_t
+struct ek_stack
 {
     void *buffer; /**< 数据缓冲区指针 */
     uint32_t sp; /**< 栈顶指针（stack pointer），指向下一个写入位置 */

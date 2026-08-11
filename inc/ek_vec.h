@@ -62,7 +62,7 @@
  *
  * @warning 遍历过程中不能删除元素，否则会导致索引混乱
  */
-#    define ek_vec_iterate(pos, v) for (pos = 0; pos < (v).amount; pos++)
+#    define ek_vec_foreach(pos, v) for (pos = 0; pos < (v).amount; pos++)
 
 /**
  * @brief 从指定索引开始遍历动态数组
@@ -72,7 +72,7 @@
  *
  * @note 如果 index 超出范围，则从数组末尾开始（不会执行循环体）
  */
-#    define ek_vec_iterate_index(pos, index, v) \
+#    define ek_vec_foreach_from(pos, index, v) \
         for (pos = ((index) < (v).amount) ? (index) : (v).amount; pos < (v).amount; pos++)
 
 /**

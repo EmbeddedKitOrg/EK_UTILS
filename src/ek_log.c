@@ -27,12 +27,12 @@ static const char *s_log_type_table[EK_LOG_LEVEL_MAX] = { "None", "Debug", "Info
 
 static char s_log_buffer[EKCFG_LOG_BUF_SIZE];
 
-__EK_WEAK uint32_t _ek_log_get_tick(void)
+__EK_WEAK uint32_t ek_port_log_get_tick(void)
 {
     return 0;
 }
 
-void _ek_log_printf(const char *tag, uint32_t line, ek_log_level_t type, uint32_t tick, const char *fmt, ...)
+void ek_log_printf(const char *tag, uint32_t line, ek_log_level_t type, uint32_t tick, const char *fmt, ...)
 {
 #    if (EKCFG_LOG_COLOR == 1)
     ek_printf(

@@ -244,8 +244,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)
 
 | 后端 | ek_conf.h 配置 | `ek_printf` 等宏 | 需实现 | 适用场景 |
 |------|---------------|------------------|--------|----------|
-| picolibc（内部默认） | `EKCFG_PICOLIBC=1` | 自动 → `printf`/`vsnprintf` 等 stdio | `int _ek_io_fputc(int ch)` | 无完整 libc 的 MCU，picolibc 预编译库 + stdout/malloc 已接管 |
-| lwprintf（模板默认） | `EKCFG_IO_LWPRTF=1, EKCFG_PICOLIBC=0` | 自动 → `lwprintf`/`lwvsnprintf` 等 | `void _ek_io_fputc(int ch)` | 极简 IO，自带轻量格式化，不依赖 libc |
+| picolibc（内部默认） | `EKCFG_PICOLIBC=1` | 自动 → `printf`/`vsnprintf` 等 stdio | `int ek_port_io_fputc(int ch)` | picolibc 标准 I/O 经适配层重定向到平台字符输出 |
+| lwprintf（模板默认） | `EKCFG_IO_LWPRTF=1, EKCFG_PICOLIBC=0` | 自动 → `lwprintf`/`lwvsnprintf` 等 | `int ek_port_io_fputc(int ch)` | 极简 IO，自带轻量格式化，不依赖 libc |
 | 标准 libc stdio 直通 | `EKCFG_PICOLIBC=0, EKCFG_IO_LWPRTF=0` | **需在 ek_conf.h 中自行定义** | 无（直接用 libc） | 已有完整 libc（桌面/新libc/RTOS 提供 stdio），直接使用系统 printf |
 
 **方式三（标准 libc stdio 直通）**：`ek_io.h` 在两者均为 0 时不定义
@@ -289,12 +289,12 @@ target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)
 
 ```c
 // ========== ek_io — 字符输出 ==========
-// lwprintf 后端：void _ek_io_fputc(int ch)；picolibc 后端：int _ek_io_fputc(int ch)
-// 标准 libc 直通（EKCFG_PICOLIBC=0 且 EKCFG_IO_LWPRTF=0）时无需实现
-void _ek_io_fputc(int ch)               // 字符输出（UART 等）
+// lwprintf / picolibc 后端：
+int ek_port_io_fputc(int ch)             // 字符输出（UART 等）
+// 标准 libc 直通后端无需实现
 
 // ========== ek_log — 时间戳 ==========
-uint32_t _ek_log_get_tick(void)          // 系统时间戳
+uint32_t ek_port_log_get_tick(void)       // 系统时间戳
 
 // ========== ek_evoke — 临界区 & 睡眠（共 5 个）==========
 void ek_evoke_enter_critical(void)       // 进入临界区（关中断）
@@ -318,13 +318,15 @@ void *ek_realloc(void *ptr, size_t size)
 // ek_port.c
 #include "ek_io.h"
 #include "ek_log.h"
+// lwprintf 与 picolibc 后端需要实现此函数
 
-void _ek_io_fputc(int ch)
+int ek_port_io_fputc(int ch)
 {
     HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+    return ch;
 }
 
-uint32_t _ek_log_get_tick(void)
+uint32_t ek_port_log_get_tick(void)
 {
     return HAL_GetTick();
 }
@@ -392,8 +394,8 @@ ek_stack_destroy_safely(sk);            // sk 释放后自动 = NULL
 |1|ek_err|基础层|零移植，纯头文件|
 |2|ek_def|基础层|零移植，编译器自动适配|
 |3|ek_conf_internal|基础层|用户创建 `ek_conf.h` 即可|
-|4|ek_io|核心服务|实现 `_ek_io_fputc()`（lwprintf/picolibc 后端）；标准 libc 直通无需实现|
-|5|ek_log|核心服务|实现 `_ek_log_get_tick()` — 系统时间戳|
+|4|ek_io|核心服务|lwprintf / picolibc 后端实现 `ek_port_io_fputc()`；标准 libc 直通无需实现|
+|5|ek_log|核心服务|实现 `ek_port_log_get_tick()` — 系统时间戳|
 |6|ek_assert|核心服务|tiny 模式零移植；full 模式依赖 `ek_log`，可选覆盖 `ek_assert_hook`|
 |7|ek_heap|核心服务|决定堆段位置（`EKCFG_HEAP_SECTION`）|
 |8|ek_list|数据结构|零移植，纯头文件|
@@ -516,15 +518,15 @@ const char *msg = ek_strerror(EK_ERR_TIMEOUT); // "Timeout"
 | 宏 | 默认值 | 说明 |
 |----|--------|------|
 | `EKCFG_IO_LWPRTF` | 0 | 使用 lwprintf 后端（与 PICOLIBC 互斥） |
-| `EKCFG_PICOLIBC` | 1 | 使用 picolibc 后端（优先级高于 LWPRTF） |
+| `EKCFG_PICOLIBC` | 1 | 使用 picolibc 后端（开启时自动关闭 lwprintf） |
 | （两者均为 0） | — | 标准 libc 直通：`ek_printf` 等宏**未定义**，需在 `ek_conf.h` 中自行定义 |
 
 **用户需实现的接口**：
-- lwprintf / picolibc 后端：`_ek_io_fputc(int ch)` — 底层单字符输出（UART 发送等）
-- 标准 libc 直通：无需实现（直接用 libc 的 stdio）
+- lwprintf / picolibc 后端：`int ek_port_io_fputc(int ch)` — 底层单字符输出（picolibc 由 `ek_picolibc_port.c` 重定向 `stdout`/`stderr`）
+- 标准 libc 直通后端：无需实现
 
 ```c
-EK_IO_FPUTC()
+int ek_port_io_fputc(int ch)
 {
     bsp_uart_send_data(ch);
     return ch;
@@ -537,9 +539,9 @@ EK_IO_FPUTC()
 
 **注意事项**：
 - `EKCFG_PICOLIBC=1` 时 `EKCFG_IO_LWPRTF` 被强制设为 0（ek_conf_internal 自动处理）
-- picolibc 模式下 `_ek_io_fputc` 返回 `int` 类型（`EOF` 表示错误）；lwprintf 模式下返回 `void`
-- 标准 libc 直通（两者均为 0）：`ek_printf`/`ek_vsnprintf` 等宏未定义，必须在 `ek_conf.h` 中补全（参见"IO 后端选择"），且 `EK_IO_FPUTC()` 展开为空、`ek_io_init()` 为空函数
-- picolibc 模式下 `ek_picolibc_port.c` 会额外接管：`stdout`/`stderr` 重定向到 `_ek_io_fputc`，`malloc`/`free`/`realloc` 与 TLSF 堆互连（`EKCFG_HEAP_TLSF=1` 时 libc 分配走 ek_malloc，反之 ek_malloc 走 libc）
+- lwprintf 与 picolibc 后端需要实现 `ek_port_io_fputc`；默认弱实现直接返回 `ch`
+- picolibc 后端由 `ek_picolibc_port.c` 使用 `ek_port_io_fputc` 重定向 `stdout`/`stderr`，`ek_io_init()` 为空函数
+- 标准 libc 直通（两者均为 0）：`ek_printf`/`ek_vsnprintf` 等宏未定义，必须在 `ek_conf.h` 中补全（参见"IO 后端选择"），`ek_io_init()` 为空函数
 
 ---
 
@@ -563,10 +565,10 @@ EK_IO_FPUTC()
 | `EKCFG_LOG_BUF_SIZE` | 256 | 单条日志缓冲区大小（字节） |
 
 **用户需实现的接口**：
-- `uint32_t _ek_log_get_tick(void)` — 返回系统时间戳（毫秒）
+- `uint32_t ek_port_log_get_tick(void)` — 返回系统时间戳（毫秒）
 
 ```c
-EK_LOG_GET_TICK()
+uint32_t ek_port_log_get_tick(void)
 {
     return HAL_GetTick();
 }
@@ -598,7 +600,7 @@ EK_LOG("plain output");             // 无级别输出（级别为 NONE，受 EK
 
 **注意事项**：
 - `EK_LOG_FATAL` 输出后进入 `while(1)` 死循环，适用于不可恢复的致命错误
-- 级别过滤是编译期行为：`_EK_LOG_MIN_LEVEL_` 为当前文件的匿名枚举常量，低于该值的日志宏完全不生成代码（零运行时开销）
+- 级别过滤由文件内的 `static const ek_log_level_t _EK_LOG_MIN_LEVEL_` 控制；编译器可在常量级别确定时消除低于阈值的日志调用
 - `EK_LOG(...)` 不标记级别，但同样受 `EK_LOG_MODULE` 设定的阈值影响（阈值 = `EK_LOG_LEVEL_NONE` 时始终输出）
 
 ---
@@ -749,6 +751,11 @@ EK_VEC_IMPLEMENT(int);          // 生成 ek_vec_int_t 类型
 ek_vec_t(int) v;                // 声明数组
 ek_vec_init(v);                 // 初始化
 ek_vec_append(v, 42);           // 追加
+
+uint32_t pos;
+ek_vec_foreach(pos, v) {
+    // 访问 v.items[pos]
+}
 ek_vec_remove(v, 0);            // 按索引移除
 ek_vec_destroy(v);              // 释放内存
 ```
@@ -757,6 +764,7 @@ ek_vec_destroy(v);              // 释放内存
 - 扩容策略：容量 <32 时翻倍，≥32 时加 1/2
 - `ek_vec_append` 内部分配失败时 `break` 跳出（不追加），需自行检测 `v.amount` 变化
 - `EK_VEC_IMPLEMENT` 必须在全局作用域使用
+- 正向遍历使用 `ek_vec_foreach(pos, v)`，从指定索引开始遍历使用 `ek_vec_foreach_from(pos, index, v)`
 
 ---
 
@@ -852,7 +860,7 @@ ek_stack_destroy_safely(&sk);
 |----|--------|------|
 | `EKCFG_STR` | 0 | 模块开关 |
 
-**用户需实现的接口**：无直接接口。`ek_str_append_fmt` 间接依赖 `ek_io` 的 `ek_vsnprintf`；是否需要实现 `_ek_io_fputc` 取决于 IO 后端选择（lwprintf/picolibc 需实现；标准 libc 直通无需，见"IO 后端选择"）。
+**用户需实现的接口**：无直接接口。`ek_str_append_fmt` 间接依赖 `ek_io` 的 `ek_vsnprintf`；lwprintf 与 picolibc 后端需实现 `ek_port_io_fputc`，标准 libc 直通后端无需实现（见"IO 后端选择"）。
 
 **链接脚本变更**：无。
 

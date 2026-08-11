@@ -18,11 +18,11 @@
 /**
  * @brief 环形缓冲区结构
  */
-typedef struct ek_ringbuf_t ek_ringbuf_t;
-typedef struct ek_ringbuf_spsc_t ek_ringbuf_spsc_t;
+typedef struct ek_ringbuf ek_ringbuf_t;
+typedef struct ek_ringbuf_spsc ek_ringbuf_spsc_t;
 
 #    if EKCFG_RINGBUF == 1
-struct ek_ringbuf_t
+struct ek_ringbuf
 {
     uint8_t *buffer; /**< 缓冲区指针 */
     uint32_t write_idx; /**< 写入位置索引 */
@@ -37,7 +37,7 @@ struct ek_ringbuf_t
 #    endif /* EKCFG_RINGBUF */
 
 #    if EKCFG_RINGBUF_SPSC == 1
-struct ek_ringbuf_spsc_t
+struct ek_ringbuf_spsc
 {
     uint8_t *buffer; /**< 缓冲区指针 */
     uint32_t write_idx; /**< 写入位置索引 */

@@ -3,9 +3,9 @@
  * @brief 标准输入输出接口
  * @author N1netyNine99
  *
- * 提供基于 lwprintf 的轻量级标准输入输出功能
+ * 提供可配置的标准输入输出封装，支持 lwprintf、picolibc 与标准 libc 后端
  *
- * @note 使用前需实现 _ek_io_fputc() 函数，用于底层字符输出
+ * @note lwprintf 与 picolibc 后端使用前需实现 ek_port_io_fputc() 函数，用于底层字符输出
  */
 
 #ifndef EK_IO_H
@@ -23,16 +23,11 @@ extern "C"
 #    include "lwprintf.h"
 
 /**
- * @brief 定义字符输出函数
+ * @brief 底层字符输出函数声明
  * @note 用户需要实现此函数，用于底层字符输出（如 UART）
- * @example
- * EK_IO_FPUTC()
- * {
- *     // 将字符 ch 输出到 UART
- *     HAL_UART_Transmit(&huart1, (uint8_t*)&ch, 1, 100);
- * }
+ * @return 写入的字符
  */
-#    define EK_IO_FPUTC() void _ek_io_fputc(int ch)
+int ek_port_io_fputc(int ch);
 
 /**
  * @brief 初始化 I/O 系统
@@ -52,26 +47,21 @@ void ek_io_init(void);
 
 /**
  * @brief 底层字符输出函数声明
- * @return 返回字符串
- */
-int _ek_io_fputc(int ch);
-
-/**
- * @brief 定义字符输出函数（picolibc 模式）
  * @note 用户需要实现此函数，用于底层字符输出（如 UART）
+ * @return 写入的字符
  */
-#    define EK_IO_FPUTC() int _ek_io_fputc(int ch)
+int ek_port_io_fputc(int ch);
 
 /**
  * @brief 初始化 I/O 系统（picolibc 模式下无需初始化）
  */
 void ek_io_init(void);
 
-#    define ek_printf     printf
-#    define ek_vprintf    vprintf
-#    define ek_sprintf    sprintf
-#    define ek_snprintf   snprintf
-#    define ek_vsnprintf  vsnprintf
+#    define ek_printf    printf
+#    define ek_vprintf   vprintf
+#    define ek_sprintf   sprintf
+#    define ek_snprintf  snprintf
+#    define ek_vsnprintf vsnprintf
 
 #else
 

@@ -18,9 +18,9 @@
 /**
  * @brief 链表节点结构
  */
-typedef struct ek_list_node_t ek_list_node_t;
+typedef struct ek_list_node ek_list_node_t;
 
-struct ek_list_node_t
+struct ek_list_node
 {
     ek_list_node_t *prev; /**< 前驱节点 */
     ek_list_node_t *next; /**< 后继节点 */
@@ -170,14 +170,14 @@ __EK_STATIC_INLINE bool ek_list_is_empty(ek_list_node_t *head)
 
 /**
  * @brief 判断节点是否是链表的最后一个节点
- * @param list 要检查的节点
+ * @param node 要检查的节点
  * @param head 链表头节点指针
  * @return true 是最后一个节点
  * @return false 不是最后一个节点
  */
-__EK_STATIC_INLINE bool ek_list_is_last(ek_list_node_t *list, ek_list_node_t *head)
+__EK_STATIC_INLINE bool ek_list_is_last(ek_list_node_t *node, ek_list_node_t *head)
 {
-    return list->next == head;
+    return node->next == head;
 }
 
 /**

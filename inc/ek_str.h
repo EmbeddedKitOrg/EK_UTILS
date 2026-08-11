@@ -29,9 +29,9 @@ extern "C"
 /**
  * @brief 动态字符串结构体
  */
-typedef struct ek_str_t ek_str_t;
+typedef struct ek_str ek_str_t;
 
-struct ek_str_t
+struct ek_str
 {
     char *buf; /**< 字符串缓冲区指针 */
     uint32_t cap; /**< 缓冲区容量（字节数） */

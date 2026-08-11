@@ -14,7 +14,7 @@
 /* 前向声明 */
 static int _ek_io_printf(int ch, lwprintf_t *lwp);
 
-__EK_WEAK int _ek_io_fputc(int ch)
+__EK_WEAK int ek_port_io_fputc(int ch)
 {
     __EK_UNUSED(ch);
     return ch;
@@ -33,7 +33,7 @@ static int _ek_io_printf(int ch, lwprintf_t *lwp)
     __EK_UNUSED(lwp);
     if (ch != '\0')
     {
-        _ek_io_fputc(ch);
+        ek_port_io_fputc(ch);
     }
     return ch;
 }
@@ -42,7 +42,7 @@ static int _ek_io_printf(int ch, lwprintf_t *lwp)
 
 #    include "../inc/ek_def.h"
 
-__EK_WEAK int _ek_io_fputc(int ch)
+__EK_WEAK int ek_port_io_fputc(int ch)
 {
     __EK_UNUSED(ch);
     return ch;
