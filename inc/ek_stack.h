@@ -102,14 +102,14 @@ void ek_stack_destroy(ek_stack_t *sk);
 ek_err_t ek_stack_init_static(ek_stack_t *sk, void *buffer, size_t item_size, uint32_t item_amount);
 void ek_stack_deinit_static(ek_stack_t *sk);
 
-#        define EK_DEFINE_STACK(name, type, item_amount)                                         \
-            static type name##_storage[(item_amount)];                                           \
-            static ek_stack_t name;                                                              \
-            static ek_err_t _static_alloc_init_##name(void)                                      \
-            {                                                                                    \
-                return ek_stack_init_static(&(name), name##_storage, sizeof(type), item_amount); \
-            }                                                                                    \
-            EK_STATIC_ALLOC_REGISTER(name, 10, _static_alloc_init_##name)
+#        define EK_DEFINE_STACK(handle, type, amount)                                           \
+            static type handle##_storage[(amount)];                                             \
+            static ek_stack_t handle;                                                           \
+            static ek_err_t _static_alloc_init_##handle(void)                                   \
+            {                                                                                   \
+                return ek_stack_init_static(&(handle), handle##_storage, sizeof(type), amount); \
+            }                                                                                   \
+            EK_STATIC_ALLOC_REGISTER(handle, 10, _static_alloc_init_##handle)
 #    endif
 
 /**

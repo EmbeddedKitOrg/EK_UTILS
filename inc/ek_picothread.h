@@ -93,7 +93,6 @@ typedef enum
  */
 struct ek_pt
 {
-    const char *name; // 任务名称
     uint8_t prio; // 优先级（数值越小优先级越高）
     ek_pt_state_t state; // 当前状态
     uint32_t tick; // 阻塞唤醒的绝对 tick
@@ -180,13 +179,12 @@ void ek_pt_init(void);
 /**
  * @brief 创建微线程
  *
- * @param name 任务名称
  * @param cb   回调函数
  * @param prio 优先级（数值越小优先级越高）
  * @param arg  用户参数
  * @return 微线程句柄，失败返回 NULL（通过断言捕获）
  */
-ek_pt_handle_t ek_pt_create(const char *name, ek_pt_cb_t cb, uint8_t prio, void *arg);
+ek_pt_handle_t ek_pt_create(ek_pt_cb_t cb, uint8_t prio, void *arg);
 
 /**
  * @brief 销毁微线程
@@ -198,45 +196,45 @@ void ek_pt_destroy(ek_pt_handle_t pt);
 #    if EKCFG_STATIC_ALLOC == 1
 #        include "ek_static_alloc.h"
 
-ek_err_t ek_pt_init_static(ek_pt_t *pt, const char *name, ek_pt_cb_t cb, uint8_t prio, void *arg);
+ek_err_t ek_pt_init_static(ek_pt_t *pt, ek_pt_cb_t cb, uint8_t prio, void *arg);
 void ek_pt_deinit_static(ek_pt_t *pt);
 
-#        define EK_DEFINE_PT(name, task_name, cb, prio, arg)                         \
-            static ek_pt_t name;                                                     \
-            static ek_err_t _static_alloc_init_##name(void)                          \
-            {                                                                        \
-                return ek_pt_init_static(&(name), (task_name), (cb), (prio), (arg)); \
-            }                                                                        \
-            EK_STATIC_ALLOC_REGISTER(name, 20, _static_alloc_init_##name)
+#        define EK_DEFINE_PT(handle, cb, prio, arg)                         \
+            static ek_pt_t handle;                                          \
+            static ek_err_t _static_alloc_init_##handle(void)               \
+            {                                                               \
+                return ek_pt_init_static(&(handle), (cb), (prio), (arg));   \
+            }                                                               \
+            EK_STATIC_ALLOC_REGISTER(handle, 20, _static_alloc_init_##handle)
 
 #        if EKCFG_PICOTHREAD_SEM == 1
 ek_err_t ek_pt_sem_init_static(ek_pt_sem_t *sem, uint8_t count);
 void ek_pt_sem_deinit_static(ek_pt_sem_t *sem);
 
-#            define EK_DEFINE_PT_SEM(name, count)                   \
-                static ek_pt_sem_t name;                            \
-                static ek_err_t _static_alloc_init_##name(void)     \
-                {                                                   \
-                    return ek_pt_sem_init_static(&(name), (count)); \
-                }                                                   \
-                EK_STATIC_ALLOC_REGISTER(name, 20, _static_alloc_init_##name)
+#            define EK_DEFINE_PT_SEM(handle, count)                     \
+                static ek_pt_sem_t handle;                              \
+                static ek_err_t _static_alloc_init_##handle(void)       \
+                {                                                       \
+                    return ek_pt_sem_init_static(&(handle), (count));   \
+                }                                                       \
+                EK_STATIC_ALLOC_REGISTER(handle, 20, _static_alloc_init_##handle)
 #        endif /* EKCFG_PICOTHREAD_SEM */
 
 #        if EKCFG_PICOTHREAD_MSG == 1
 ek_err_t ek_pt_msg_init_static(ek_pt_msg_t *msg, void *buffer, size_t item_size, uint32_t item_amount);
 void ek_pt_msg_deinit_static(ek_pt_msg_t *msg);
 
-#            define EK_DEFINE_PT_MSG(name, type, item_amount) \
-                static type name##_storage[(item_amount)];    \
-                static ek_pt_msg_t name;                      \
-                static ek_err_t _static_alloc_init_##name(void)                           \
+#            define EK_DEFINE_PT_MSG(handle, type, amount) \
+                static type handle##_storage[(amount)];    \
+                static ek_pt_msg_t handle;                 \
+                static ek_err_t _static_alloc_init_##handle(void)                         \
                 {                                                                         \
-                    return ek_pt_msg_init_static(&(name),                                 \
-                                                 name##_storage,                          \
+                    return ek_pt_msg_init_static(&(handle),                               \
+                                                 handle##_storage,                        \
                                                  sizeof(type),                            \
-                                                 (item_amount));                          \
+                                                 (amount));                               \
                 }                                                                         \
-                EK_STATIC_ALLOC_REGISTER(name, 20, _static_alloc_init_##name)
+                EK_STATIC_ALLOC_REGISTER(handle, 20, _static_alloc_init_##handle)
 #        endif /* EKCFG_PICOTHREAD_MSG */
 #    endif     /* EKCFG_STATIC_ALLOC */
 

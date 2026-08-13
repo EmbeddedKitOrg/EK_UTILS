@@ -91,14 +91,14 @@ void ek_ringbuf_destroy(ek_ringbuf_t *rb);
 ek_err_t ek_ringbuf_init_static(ek_ringbuf_t *rb, void *buffer, size_t item_size, uint32_t item_amount);
 void ek_ringbuf_deinit_static(ek_ringbuf_t *rb);
 
-#            define EK_DEFINE_RINGBUF(name, type, item_amount)                                          \
-                static type name##_storage[(item_amount)];                                              \
-                static ek_ringbuf_t name;                                                               \
-                static ek_err_t _static_alloc_init_##name(void)                                         \
-                {                                                                                       \
-                    return ek_ringbuf_init_static(&(name), name##_storage, sizeof(type), item_amount); \
-                }                                                                                       \
-                EK_STATIC_ALLOC_REGISTER(name, 10, _static_alloc_init_##name)
+#            define EK_DEFINE_RINGBUF(handle, type, amount)                                            \
+                static type handle##_storage[(amount)];                                                \
+                static ek_ringbuf_t handle;                                                            \
+                static ek_err_t _static_alloc_init_##handle(void)                                      \
+                {                                                                                      \
+                    return ek_ringbuf_init_static(&(handle), handle##_storage, sizeof(type), amount); \
+                }                                                                                      \
+                EK_STATIC_ALLOC_REGISTER(handle, 10, _static_alloc_init_##handle)
 #        endif
 
 /**
@@ -176,17 +176,17 @@ ek_ringbuf_spsc_t *ek_ringbuf_create_spsc(size_t item_size, uint32_t item_amount
 void ek_ringbuf_destroy_spsc(ek_ringbuf_spsc_t *rb);
 
 #        if EKCFG_STATIC_ALLOC == 1
-ek_err_t ek_ringbuf_init_spsc_static(ek_ringbuf_spsc_t *rb, void *buffer, size_t item_size, uint32_t slot_amount);
+ek_err_t ek_ringbuf_init_spsc_static(ek_ringbuf_spsc_t *rb, void *buffer, size_t item_size, uint32_t amount);
 void ek_ringbuf_deinit_spsc_static(ek_ringbuf_spsc_t *rb);
 
-#            define EK_DEFINE_RINGBUF_SPSC(name, type, slot_amount)                                          \
-                static type name##_storage[(slot_amount)];                                                  \
-                static ek_ringbuf_spsc_t name;                                                              \
-                static ek_err_t _static_alloc_init_##name(void)                                             \
-                {                                                                                           \
-                    return ek_ringbuf_init_spsc_static(&(name), name##_storage, sizeof(type), slot_amount); \
-                }                                                                                           \
-                EK_STATIC_ALLOC_REGISTER(name, 10, _static_alloc_init_##name)
+#            define EK_DEFINE_RINGBUF_SPSC(handle, type, amount)                                            \
+                static type handle##_storage[(amount)];                                                    \
+                static ek_ringbuf_spsc_t handle;                                                           \
+                static ek_err_t _static_alloc_init_##handle(void)                                          \
+                {                                                                                          \
+                    return ek_ringbuf_init_spsc_static(&(handle), handle##_storage, sizeof(type), amount); \
+                }                                                                                          \
+                EK_STATIC_ALLOC_REGISTER(handle, 10, _static_alloc_init_##handle)
 #        endif
 
 /**

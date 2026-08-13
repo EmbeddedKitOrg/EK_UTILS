@@ -83,7 +83,6 @@ struct ek_evoke_task
 {
     ek_evoke_state_t state; /**< 任务状态 */
     ek_list_node_t node; /**< 链表节点 */
-    const char *name; /**< 任务名称 */
     ek_evoke_event_t *wait_event; /**< 等待的事件 */
     void *arg; /**< 用户参数 */
     ek_evoke_cb_t cb; /**< 回调函数 */
@@ -95,7 +94,6 @@ struct ek_evoke_task
 struct ek_evoke_event
 {
     ek_list_node_t wait_list; /**< 等待该事件的任务链表 */
-    const char *name; /**< 事件名称 */
     uint32_t count; /**< 事件计数（用于信号量机制） */
     void *data; /**< 事件携带的数据 */
 };
@@ -113,12 +111,11 @@ void ek_evoke_init(void);
 
 /**
  * @brief 创建任务
- * @param name 任务名称
  * @param cb 任务回调函数
  * @param arg 用户参数
  * @return 任务句柄
  */
-ek_evoke_task_handle_t ek_evoke_task_create(const char *name, ek_evoke_cb_t cb, void *arg);
+ek_evoke_task_handle_t ek_evoke_task_create(ek_evoke_cb_t cb, void *arg);
 
 /**
  * @brief 销毁任务
@@ -128,11 +125,10 @@ void ek_evoke_task_destroy(ek_evoke_task_handle_t tsk);
 
 /**
  * @brief 创建事件
- * @param name 事件名称
  * @param init 初始计数值
  * @return 事件句柄
  */
-ek_evoke_event_handle_t ek_evoke_event_create(const char *name, uint32_t init);
+ek_evoke_event_handle_t ek_evoke_event_create(uint32_t init);
 
 /**
  * @brief 销毁事件
@@ -145,26 +141,26 @@ void ek_evoke_event_destroy(ek_evoke_event_handle_t evt);
 #    if EKCFG_STATIC_ALLOC == 1
 #        include "ek_static_alloc.h"
 
-ek_err_t ek_evoke_task_init_static(ek_evoke_task_t *tsk, const char *name, ek_evoke_cb_t cb, void *arg);
+ek_err_t ek_evoke_task_init_static(ek_evoke_task_t *tsk, ek_evoke_cb_t cb, void *arg);
 void ek_evoke_task_deinit_static(ek_evoke_task_t *tsk);
-ek_err_t ek_evoke_event_init_static(ek_evoke_event_t *evt, const char *name, uint32_t init);
+ek_err_t ek_evoke_event_init_static(ek_evoke_event_t *evt, uint32_t init);
 void ek_evoke_event_deinit_static(ek_evoke_event_t *evt);
 
-#        define EK_DEFINE_EVOKE_TASK(name, task_name, cb, arg)                       \
-            static ek_evoke_task_t name;                                             \
-            static ek_err_t _static_alloc_init_##name(void)                          \
-            {                                                                        \
-                return ek_evoke_task_init_static(&(name), (task_name), (cb), (arg)); \
-            }                                                                        \
-            EK_STATIC_ALLOC_REGISTER(name, 20, _static_alloc_init_##name)
+#        define EK_DEFINE_EVOKE_TASK(handle, cb, arg)                        \
+            static ek_evoke_task_t handle;                                   \
+            static ek_err_t _static_alloc_init_##handle(void)                \
+            {                                                                \
+                return ek_evoke_task_init_static(&(handle), (cb), (arg));    \
+            }                                                                \
+            EK_STATIC_ALLOC_REGISTER(handle, 20, _static_alloc_init_##handle)
 
-#        define EK_DEFINE_EVOKE_EVENT(name, event_name, init_count)                      \
-            static ek_evoke_event_t name;                                                \
-            static ek_err_t _static_alloc_init_##name(void)                              \
-            {                                                                            \
-                return ek_evoke_event_init_static(&(name), (event_name), (init_count)); \
-            }                                                                            \
-            EK_STATIC_ALLOC_REGISTER(name, 20, _static_alloc_init_##name)
+#        define EK_DEFINE_EVOKE_EVENT(handle, init_count)                     \
+            static ek_evoke_event_t handle;                                  \
+            static ek_err_t _static_alloc_init_##handle(void)                \
+            {                                                                \
+                return ek_evoke_event_init_static(&(handle), (init_count));  \
+            }                                                                \
+            EK_STATIC_ALLOC_REGISTER(handle, 20, _static_alloc_init_##handle)
 #    endif /* EKCFG_STATIC_ALLOC */
 
 /* ========== 事件订阅/分发 ========== */

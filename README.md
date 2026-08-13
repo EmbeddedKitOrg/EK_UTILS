@@ -988,8 +988,8 @@ int main(void) {
     ek_export_init();         // 自动初始化 heap → evoke
 
     // 创建任务和事件
-    ek_evoke_task_handle_t tsk = ek_evoke_task_create("led", led_cb, NULL);
-    ek_evoke_event_handle_t evt = ek_evoke_event_create("timer", 0);
+    ek_evoke_task_handle_t tsk = ek_evoke_task_create(led_cb, NULL);
+    ek_evoke_event_handle_t evt = ek_evoke_event_create(0);
     ek_evoke_event_subscribe(tsk, evt);
 
     ek_evoke_event_loop();   // 永不返回
@@ -1056,7 +1056,7 @@ static void led_task(ek_pt_handle_t pt, void *arg) {
 
 int main(void) {
     ek_export_init();
-    ek_pt_create("led", led_task, 0, NULL);
+    ek_pt_create(led_task, 0, NULL);
 
     while (1) {
         uint32_t now = get_tick();

@@ -107,12 +107,11 @@ void ek_evoke_init(void)
 EK_EXPORT_COMPONENTS(ek_evoke_init, 0);
 
 #    if EKCFG_STATIC_ALLOC == 1
-ek_err_t ek_evoke_task_init_static(ek_evoke_task_t *tsk, const char *name, ek_evoke_cb_t cb, void *arg)
+ek_err_t ek_evoke_task_init_static(ek_evoke_task_t *tsk, ek_evoke_cb_t cb, void *arg)
 {
     if (tsk == NULL || cb == NULL) return EK_ERR_INVAL;
 
     ek_list_init(&tsk->node);
-    tsk->name = name;
     tsk->cb = cb;
     tsk->arg = arg;
     tsk->state = EK_EVOKE_STATE_IDLE;
@@ -133,12 +132,11 @@ void ek_evoke_task_deinit_static(ek_evoke_task_t *tsk)
     tsk->arg = NULL;
 }
 
-ek_err_t ek_evoke_event_init_static(ek_evoke_event_t *evt, const char *name, uint32_t init)
+ek_err_t ek_evoke_event_init_static(ek_evoke_event_t *evt, uint32_t init)
 {
     if (evt == NULL) return EK_ERR_INVAL;
 
     ek_list_init(&evt->wait_list);
-    evt->name = name;
     evt->count = init;
     evt->data = NULL;
     return EK_ERR_NONE;
@@ -160,7 +158,7 @@ void ek_evoke_event_deinit_static(ek_evoke_event_t *evt)
 }
 #    endif /* EKCFG_STATIC_ALLOC */
 
-ek_evoke_task_handle_t ek_evoke_task_create(const char *name, ek_evoke_cb_t cb, void *arg)
+ek_evoke_task_handle_t ek_evoke_task_create(ek_evoke_cb_t cb, void *arg)
 {
     ek_assert_param(cb != NULL);
 
@@ -168,7 +166,6 @@ ek_evoke_task_handle_t ek_evoke_task_create(const char *name, ek_evoke_cb_t cb, 
     ek_assert_param(tsk != NULL);
 
     ek_list_init(&tsk->node);
-    tsk->name = name;
     tsk->cb = cb;
     tsk->arg = arg;
     tsk->state = EK_EVOKE_STATE_IDLE;
@@ -187,13 +184,12 @@ void ek_evoke_task_destroy(ek_evoke_task_handle_t tsk)
     ek_free(tsk);
 }
 
-ek_evoke_event_handle_t ek_evoke_event_create(const char *name, uint32_t init)
+ek_evoke_event_handle_t ek_evoke_event_create(uint32_t init)
 {
     ek_evoke_event_t *evt = ek_malloc(sizeof(*evt));
     ek_assert_param(evt != NULL);
 
     ek_list_init(&evt->wait_list);
-    evt->name = name;
     evt->count = init;
     evt->data = NULL;
 

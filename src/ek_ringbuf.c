@@ -186,12 +186,12 @@ bool ek_ringbuf_empty_spsc(const ek_ringbuf_spsc_t *rb)
     return rb->read_idx == rb->write_idx;
 }
 #        if EKCFG_STATIC_ALLOC == 1
-ek_err_t ek_ringbuf_init_spsc_static(ek_ringbuf_spsc_t *rb, void *buffer, size_t item_size, uint32_t slot_amount)
+ek_err_t ek_ringbuf_init_spsc_static(ek_ringbuf_spsc_t *rb, void *buffer, size_t item_size, uint32_t amount)
 {
-    if (rb == NULL || buffer == NULL || item_size == 0U || slot_amount <= 1U) return EK_ERR_INVAL;
+    if (rb == NULL || buffer == NULL || item_size == 0U || amount <= 1U) return EK_ERR_INVAL;
 
     rb->buffer = (uint8_t *)buffer;
-    rb->cap = slot_amount;
+    rb->cap = amount;
     rb->item_size = item_size;
     rb->read_idx = 0U;
     rb->write_idx = 0U;

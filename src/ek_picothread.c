@@ -31,11 +31,10 @@ void ek_pt_init(void)
 EK_EXPORT_COMPONENTS(ek_pt_init, 0);
 
 #    if EKCFG_STATIC_ALLOC == 1
-ek_err_t ek_pt_init_static(ek_pt_t *pt, const char *name, ek_pt_cb_t cb, uint8_t prio, void *arg)
+ek_err_t ek_pt_init_static(ek_pt_t *pt, ek_pt_cb_t cb, uint8_t prio, void *arg)
 {
     if (pt == NULL || cb == NULL || s_init == false) return EK_ERR_INVAL;
 
-    pt->name = name;
     pt->cb = cb;
     pt->arg = arg;
     pt->prio = prio;
@@ -87,13 +86,12 @@ void ek_pt_deinit_static(ek_pt_t *pt)
 }
 #    endif /* EKCFG_STATIC_ALLOC */
 
-ek_pt_handle_t ek_pt_create(const char *name, ek_pt_cb_t cb, uint8_t prio, void *arg)
+ek_pt_handle_t ek_pt_create(ek_pt_cb_t cb, uint8_t prio, void *arg)
 {
     ek_assert_param(s_init == true);
     ek_assert_param(cb != NULL);
     ek_pt_t *pt = ek_malloc(sizeof(*pt));
     ek_assert_param(pt != NULL);
-    pt->name = name;
     pt->cb = cb;
     pt->arg = arg;
     pt->prio = prio;

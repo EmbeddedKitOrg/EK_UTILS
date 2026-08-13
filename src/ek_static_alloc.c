@@ -1,12 +1,10 @@
 #include "ek_static_alloc.h"
 
 #if EKCFG_STATIC_ALLOC == 1
-
-#    include <stdlib.h>
 #    include "ek_export.h"
 #    if EKCFG_LOG == 1
 #        include "ek_log.h"
-EK_LOG_FILE_TAG("ek_static_alloc.c");
+EK_LOG_MODULE("ek_static_alloc.c", EK_LOG_LEVEL_ERROR);
 #    endif
 
 extern const _ek_static_alloc_item_t _ek_static_alloc_start;
@@ -37,9 +35,9 @@ void ek_static_alloc_init(void)
         if (err != EK_ERR_NONE)
         {
             if (s_static_alloc_error == EK_ERR_NONE) s_static_alloc_error = err;
-#        if EKCFG_LOG == 1
+#    if EKCFG_LOG == 1
             EK_LOG_ERROR("static allocation init failed: %s: %s", items[i].name, ek_strerror(err));
-#        endif
+#    endif
         }
     }
 }
