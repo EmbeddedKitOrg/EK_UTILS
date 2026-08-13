@@ -49,9 +49,9 @@ typedef ek_pt_msg_t *ek_pt_msg_handle_t;
  */
 struct ek_pt_msg
 {
-    ek_ringbuf_t *rb; // 消息缓冲区
-    ek_list_node_t recv_wait; // 接收等待队列（缓冲区空时阻塞）
-    ek_list_node_t send_wait; // 发送等待队列（缓冲区满时阻塞）
+    ek_ringbuf_t rb;
+    ek_list_node_t recv_wait;
+    ek_list_node_t send_wait;
 };
 #    endif /* EKCFG_PICOTHREAD_MSG */
 
@@ -194,6 +194,51 @@ ek_pt_handle_t ek_pt_create(const char *name, ek_pt_cb_t cb, uint8_t prio, void 
  * @param pt 微线程句柄
  */
 void ek_pt_destroy(ek_pt_handle_t pt);
+
+#    if EKCFG_STATIC_ALLOC == 1
+#        include "ek_static_alloc.h"
+
+ek_err_t ek_pt_init_static(ek_pt_t *pt, const char *name, ek_pt_cb_t cb, uint8_t prio, void *arg);
+void ek_pt_deinit_static(ek_pt_t *pt);
+
+#        define EK_DEFINE_PT(name, task_name, cb, prio, arg)                         \
+            static ek_pt_t name;                                                     \
+            static ek_err_t _static_alloc_init_##name(void)                          \
+            {                                                                        \
+                return ek_pt_init_static(&(name), (task_name), (cb), (prio), (arg)); \
+            }                                                                        \
+            EK_STATIC_ALLOC_REGISTER(name, 20, _static_alloc_init_##name)
+
+#        if EKCFG_PICOTHREAD_SEM == 1
+ek_err_t ek_pt_sem_init_static(ek_pt_sem_t *sem, uint8_t count);
+void ek_pt_sem_deinit_static(ek_pt_sem_t *sem);
+
+#            define EK_DEFINE_PT_SEM(name, count)                   \
+                static ek_pt_sem_t name;                            \
+                static ek_err_t _static_alloc_init_##name(void)     \
+                {                                                   \
+                    return ek_pt_sem_init_static(&(name), (count)); \
+                }                                                   \
+                EK_STATIC_ALLOC_REGISTER(name, 20, _static_alloc_init_##name)
+#        endif /* EKCFG_PICOTHREAD_SEM */
+
+#        if EKCFG_PICOTHREAD_MSG == 1
+ek_err_t ek_pt_msg_init_static(ek_pt_msg_t *msg, void *buffer, size_t item_size, uint32_t item_amount);
+void ek_pt_msg_deinit_static(ek_pt_msg_t *msg);
+
+#            define EK_DEFINE_PT_MSG(name, type, item_amount) \
+                static type name##_storage[(item_amount)];    \
+                static ek_pt_msg_t name;                      \
+                static ek_err_t _static_alloc_init_##name(void)                           \
+                {                                                                         \
+                    return ek_pt_msg_init_static(&(name),                                 \
+                                                 name##_storage,                          \
+                                                 sizeof(type),                            \
+                                                 (item_amount));                          \
+                }                                                                         \
+                EK_STATIC_ALLOC_REGISTER(name, 20, _static_alloc_init_##name)
+#        endif /* EKCFG_PICOTHREAD_MSG */
+#    endif     /* EKCFG_STATIC_ALLOC */
 
 /**
  * @brief 执行一次调度

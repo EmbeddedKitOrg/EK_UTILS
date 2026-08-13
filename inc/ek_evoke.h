@@ -142,6 +142,31 @@ ek_evoke_event_handle_t ek_evoke_event_create(const char *name, uint32_t init);
  */
 void ek_evoke_event_destroy(ek_evoke_event_handle_t evt);
 
+#    if EKCFG_STATIC_ALLOC == 1
+#        include "ek_static_alloc.h"
+
+ek_err_t ek_evoke_task_init_static(ek_evoke_task_t *tsk, const char *name, ek_evoke_cb_t cb, void *arg);
+void ek_evoke_task_deinit_static(ek_evoke_task_t *tsk);
+ek_err_t ek_evoke_event_init_static(ek_evoke_event_t *evt, const char *name, uint32_t init);
+void ek_evoke_event_deinit_static(ek_evoke_event_t *evt);
+
+#        define EK_DEFINE_EVOKE_TASK(name, task_name, cb, arg)                       \
+            static ek_evoke_task_t name;                                             \
+            static ek_err_t _static_alloc_init_##name(void)                          \
+            {                                                                        \
+                return ek_evoke_task_init_static(&(name), (task_name), (cb), (arg)); \
+            }                                                                        \
+            EK_STATIC_ALLOC_REGISTER(name, 20, _static_alloc_init_##name)
+
+#        define EK_DEFINE_EVOKE_EVENT(name, event_name, init_count)                      \
+            static ek_evoke_event_t name;                                                \
+            static ek_err_t _static_alloc_init_##name(void)                              \
+            {                                                                            \
+                return ek_evoke_event_init_static(&(name), (event_name), (init_count)); \
+            }                                                                            \
+            EK_STATIC_ALLOC_REGISTER(name, 20, _static_alloc_init_##name)
+#    endif /* EKCFG_STATIC_ALLOC */
+
 /* ========== 事件订阅/分发 ========== */
 
 /**

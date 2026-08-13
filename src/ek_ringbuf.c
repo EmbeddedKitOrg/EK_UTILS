@@ -25,6 +25,38 @@ bool ek_ringbuf_empty(const ek_ringbuf_t *rb)
     return rb->item_amount == 0;
 }
 
+#        if EKCFG_STATIC_ALLOC == 1
+ek_err_t ek_ringbuf_init_static(ek_ringbuf_t *rb, void *buffer, size_t item_size, uint32_t item_amount)
+{
+    if (rb == NULL || buffer == NULL || item_size == 0U || item_amount == 0U) return EK_ERR_INVAL;
+
+    rb->buffer = (uint8_t *)buffer;
+    rb->cap = item_amount;
+    rb->item_size = item_size;
+    rb->read_idx = 0U;
+    rb->write_idx = 0U;
+    rb->item_amount = 0U;
+#            if EKCFG_RTOS == 1
+    EK_LOCK_INIT(rb->lock);
+#            endif /* EKCFG_RTOS */
+    return EK_ERR_NONE;
+}
+
+void ek_ringbuf_deinit_static(ek_ringbuf_t *rb)
+{
+    if (rb == NULL) return;
+#            if EKCFG_RTOS == 1
+    EK_LOCK_DEINIT(rb->lock);
+#            endif
+    rb->buffer = NULL;
+    rb->cap = 0U;
+    rb->item_size = 0U;
+    rb->read_idx = 0U;
+    rb->write_idx = 0U;
+    rb->item_amount = 0U;
+}
+#        endif /* EKCFG_STATIC_ALLOC */
+
 ek_ringbuf_t *ek_ringbuf_create(size_t item_size, uint32_t item_amount)
 {
     ek_assert_param(item_amount != 0);
@@ -44,13 +76,12 @@ ek_ringbuf_t *ek_ringbuf_create(size_t item_size, uint32_t item_amount)
 
     rb->cap = item_amount;
     rb->item_size = item_size;
-    rb->read_idx = 0;
-    rb->write_idx = 0;
-    rb->item_amount = 0;
+    rb->read_idx = 0U;
+    rb->write_idx = 0U;
+    rb->item_amount = 0U;
 #        if EKCFG_RTOS == 1
     EK_LOCK_INIT(rb->lock);
 #        endif /* EKCFG_RTOS */
-
     return rb;
 }
 
@@ -154,6 +185,29 @@ bool ek_ringbuf_empty_spsc(const ek_ringbuf_spsc_t *rb)
     ek_assert_param(rb != NULL);
     return rb->read_idx == rb->write_idx;
 }
+#        if EKCFG_STATIC_ALLOC == 1
+ek_err_t ek_ringbuf_init_spsc_static(ek_ringbuf_spsc_t *rb, void *buffer, size_t item_size, uint32_t slot_amount)
+{
+    if (rb == NULL || buffer == NULL || item_size == 0U || slot_amount <= 1U) return EK_ERR_INVAL;
+
+    rb->buffer = (uint8_t *)buffer;
+    rb->cap = slot_amount;
+    rb->item_size = item_size;
+    rb->read_idx = 0U;
+    rb->write_idx = 0U;
+    return EK_ERR_NONE;
+}
+
+void ek_ringbuf_deinit_spsc_static(ek_ringbuf_spsc_t *rb)
+{
+    if (rb == NULL) return;
+    rb->buffer = NULL;
+    rb->cap = 0U;
+    rb->item_size = 0U;
+    rb->read_idx = 0U;
+    rb->write_idx = 0U;
+}
+#        endif /* EKCFG_STATIC_ALLOC */
 
 ek_ringbuf_spsc_t *ek_ringbuf_create_spsc(size_t item_size, uint32_t item_amount)
 {
@@ -177,7 +231,6 @@ ek_ringbuf_spsc_t *ek_ringbuf_create_spsc(size_t item_size, uint32_t item_amount
     rb->item_size = item_size;
     rb->read_idx = 0U;
     rb->write_idx = 0U;
-
     return rb;
 }
 

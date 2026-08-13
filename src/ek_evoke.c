@@ -47,7 +47,8 @@ static volatile bool s_defer_evt_wakeup;
 
 static _defer_req_t s_defer_req_pool[EK_EVOKE_MAX_DEFER_REQ];
 static ek_list_node_t s_defer_pool_free_list;
-static ek_ringbuf_spsc_t *s_isr_fifo;
+static ek_ringbuf_spsc_t s_isr_fifo;
+static _isr_req_t s_isr_fifo_storage[EK_EVOKE_MAX_ISR_REQ];
 
 static ek_list_node_t s_ready_task_list;
 static ek_list_node_t s_defer_evt_list;
@@ -91,8 +92,11 @@ void ek_evoke_init(void)
         ek_list_insert_tail(&s_defer_pool_free_list, &s_defer_req_pool[i].node);
     }
 
-    s_isr_fifo = ek_ringbuf_create_spsc(sizeof(_isr_req_t), EK_EVOKE_MAX_ISR_REQ);
-    ek_assert_param(s_isr_fifo != NULL);
+    s_isr_fifo.buffer = (uint8_t *)s_isr_fifo_storage;
+    s_isr_fifo.cap = EK_EVOKE_MAX_ISR_REQ;
+    s_isr_fifo.item_size = sizeof(_isr_req_t);
+    s_isr_fifo.read_idx = 0U;
+    s_isr_fifo.write_idx = 0U;
 
     s_defer_earliest_tick = UINT32_MAX;
     s_event_tick_base = 0;
@@ -101,6 +105,60 @@ void ek_evoke_init(void)
 }
 
 EK_EXPORT_COMPONENTS(ek_evoke_init, 0);
+
+#    if EKCFG_STATIC_ALLOC == 1
+ek_err_t ek_evoke_task_init_static(ek_evoke_task_t *tsk, const char *name, ek_evoke_cb_t cb, void *arg)
+{
+    if (tsk == NULL || cb == NULL) return EK_ERR_INVAL;
+
+    ek_list_init(&tsk->node);
+    tsk->name = name;
+    tsk->cb = cb;
+    tsk->arg = arg;
+    tsk->state = EK_EVOKE_STATE_IDLE;
+    tsk->wait_event = NULL;
+    return EK_ERR_NONE;
+}
+
+void ek_evoke_task_deinit_static(ek_evoke_task_t *tsk)
+{
+    if (tsk == NULL) return;
+    if (tsk->state != EK_EVOKE_STATE_IDLE)
+    {
+        ek_list_remove(&tsk->node);
+    }
+    tsk->state = EK_EVOKE_STATE_IDLE;
+    tsk->wait_event = NULL;
+    tsk->cb = NULL;
+    tsk->arg = NULL;
+}
+
+ek_err_t ek_evoke_event_init_static(ek_evoke_event_t *evt, const char *name, uint32_t init)
+{
+    if (evt == NULL) return EK_ERR_INVAL;
+
+    ek_list_init(&evt->wait_list);
+    evt->name = name;
+    evt->count = init;
+    evt->data = NULL;
+    return EK_ERR_NONE;
+}
+
+void ek_evoke_event_deinit_static(ek_evoke_event_t *evt)
+{
+    if (evt == NULL) return;
+    while (!ek_list_is_empty(&evt->wait_list))
+    {
+        ek_list_node_t *node = ek_list_get_first(&evt->wait_list);
+        ek_evoke_task_t *tsk = ek_list_container(node, ek_evoke_task_t, node);
+        ek_list_remove(&tsk->node);
+        tsk->wait_event = NULL;
+        tsk->state = EK_EVOKE_STATE_IDLE;
+    }
+    evt->count = 0U;
+    evt->data = NULL;
+}
+#    endif /* EKCFG_STATIC_ALLOC */
 
 ek_evoke_task_handle_t ek_evoke_task_create(const char *name, ek_evoke_cb_t cb, void *arg)
 {
@@ -269,8 +327,7 @@ ek_err_t ek_evoke_event_broadcast_from_isr(ek_evoke_event_handle_t evt, void *pa
         .evt = evt,
         .payload = payload,
     };
-    ek_err_t err = EK_ERR_NONE;
-    ek_ringbuf_write_spsc(s_isr_fifo, &req);
+    ek_err_t err = ek_ringbuf_write_spsc(&s_isr_fifo, &req);
     EK_ERR_GOTO(err, defer);
 
 defer:
@@ -289,8 +346,7 @@ ek_err_t ek_evoke_event_publish_from_isr(ek_evoke_event_handle_t evt, void *payl
         .evt = evt,
         .payload = payload,
     };
-    ek_err_t err = EK_ERR_NONE;
-    err = ek_ringbuf_write_spsc(s_isr_fifo, &req);
+    ek_err_t err = ek_ringbuf_write_spsc(&s_isr_fifo, &req);
     EK_ERR_GOTO(err, defer);
 
 defer:
@@ -311,10 +367,7 @@ ek_err_t ek_evoke_event_defer_from_isr(ek_evoke_event_handle_t evt, void *payloa
         .payload = payload,
         .delay = delay,
     };
-    ek_ringbuf_write_spsc(s_isr_fifo, &req);
-
-    ek_err_t err = EK_ERR_NONE;
-    err = ek_ringbuf_write_spsc(s_isr_fifo, &req);
+    ek_err_t err = ek_ringbuf_write_spsc(&s_isr_fifo, &req);
     EK_ERR_GOTO(err, defer);
 
 defer:
@@ -328,10 +381,10 @@ void ek_evoke_event_loop(void)
     {
         // 先处理是否有来自中断的请求
         // 从中断请求fifo中读取
-        while (!ek_ringbuf_empty_spsc(s_isr_fifo))
+        while (!ek_ringbuf_empty_spsc(&s_isr_fifo))
         {
             _isr_req_t req = { 0 };
-            if (ek_ringbuf_read_spsc(s_isr_fifo, &req) == EK_ERR_NONE)
+            if (ek_ringbuf_read_spsc(&s_isr_fifo, &req) == EK_ERR_NONE)
             {
                 if (req.type & ISR_REQ_PUBLISH)
                 {

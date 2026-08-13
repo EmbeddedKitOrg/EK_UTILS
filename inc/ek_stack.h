@@ -21,6 +21,7 @@
 #if EKCFG_STACK == 1
 
 #    include "ek_err.h"
+#    include "ek_def.h"
 
 /**
  * @brief 栈结构体
@@ -94,6 +95,22 @@ ek_stack_t *ek_stack_create(size_t item_size, uint32_t item_amount);
  * @warning 不应对同一个栈多次调用此函数
  */
 void ek_stack_destroy(ek_stack_t *sk);
+
+#    if EKCFG_STATIC_ALLOC == 1
+#        include "ek_static_alloc.h"
+
+ek_err_t ek_stack_init_static(ek_stack_t *sk, void *buffer, size_t item_size, uint32_t item_amount);
+void ek_stack_deinit_static(ek_stack_t *sk);
+
+#        define EK_DEFINE_STACK(name, type, item_amount)                                         \
+            static type name##_storage[(item_amount)];                                           \
+            static ek_stack_t name;                                                              \
+            static ek_err_t _static_alloc_init_##name(void)                                      \
+            {                                                                                    \
+                return ek_stack_init_static(&(name), name##_storage, sizeof(type), item_amount); \
+            }                                                                                    \
+            EK_STATIC_ALLOC_REGISTER(name, 10, _static_alloc_init_##name)
+#    endif
 
 /**
  * @brief 销毁栈并把sk_ptr设置为NULL

@@ -23,6 +23,34 @@ bool ek_stack_empty(ek_stack_t *sk)
     return sk->sp == 0;
 }
 
+#    if EKCFG_STATIC_ALLOC == 1
+ek_err_t ek_stack_init_static(ek_stack_t *sk, void *buffer, size_t item_size, uint32_t item_amount)
+{
+    if (sk == NULL || buffer == NULL || item_size == 0U || item_amount == 0U) return EK_ERR_INVAL;
+
+    sk->buffer = buffer;
+    sk->sp = 0U;
+    sk->cap = item_amount;
+    sk->item_size = item_size;
+#        if EKCFG_RTOS == 1
+    EK_LOCK_INIT(sk->lock);
+#        endif /* EKCFG_RTOS */
+    return EK_ERR_NONE;
+}
+
+void ek_stack_deinit_static(ek_stack_t *sk)
+{
+    if (sk == NULL) return;
+#        if EKCFG_RTOS == 1
+    EK_LOCK_DEINIT(sk->lock);
+#        endif
+    sk->buffer = NULL;
+    sk->sp = 0U;
+    sk->cap = 0U;
+    sk->item_size = 0U;
+}
+#    endif /* EKCFG_STATIC_ALLOC */
+
 ek_stack_t *ek_stack_create(size_t item_size, uint32_t item_amount)
 {
     ek_assert_param(item_amount != 0);
@@ -40,13 +68,12 @@ ek_stack_t *ek_stack_create(size_t item_size, uint32_t item_amount)
         return NULL;
     }
 
-    sk->sp = 0;
+    sk->sp = 0U;
     sk->cap = item_amount;
     sk->item_size = item_size;
 #    if EKCFG_RTOS == 1
     EK_LOCK_INIT(sk->lock);
 #    endif /* EKCFG_RTOS */
-
     return sk;
 }
 
