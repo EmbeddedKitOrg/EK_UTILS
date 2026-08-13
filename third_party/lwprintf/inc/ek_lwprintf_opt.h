@@ -151,6 +151,4 @@ extern "C"
 }
 #endif /* __cplusplus */
 
-
-
-#endif/* __EK_LWPRINTF_OPT_H */
+#endif /* __EK_LWPRINTF_OPT_H */

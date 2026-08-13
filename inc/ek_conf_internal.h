@@ -46,7 +46,9 @@
 #ifndef EKCFG_IO_LWPRTF
 #    define EKCFG_IO_LWPRTF (0) /**< IO 是否使用 lwprintf (1=使用, 0=不使用) */
 #endif
-
+#ifndef EKCFG_STATIC_ALLOC
+#    define EKCFG_STATIC_ALLOC (0) /**< 是否开启静态分配 (1=使用, 0=不使用) */
+#endif
 /* ========================================================================
  * 锁抽象层 — RTOS 线程安全
  * ========================================================================
@@ -159,6 +161,12 @@
 #endif
 #ifndef EKCFG_HEAP_SIZE
 #    define EKCFG_HEAP_SIZE (30 * 1024) /**< 内存堆大小（字节） */
+#endif
+#ifndef EKCFG_TLSF_FL_INDEX_MAX
+#    define EKCFG_TLSF_FL_INDEX_MAX (24) /**< TLSF 一级索引最大值，最大连续块为 2 的该值次方字节 */
+#endif
+#ifndef EKCFG_TLSF_SL_INDEX_COUNT_LOG2
+#    define EKCFG_TLSF_SL_INDEX_COUNT_LOG2 (3) /**< TLSF 二级索引数量的 log2，二级链表数为 2 的该值次方 */
 #endif
 #ifndef EKCFG_LOG_DEBUG
 #    define EKCFG_LOG_DEBUG (1) /**< 启用 DEBUG 级别日志 */

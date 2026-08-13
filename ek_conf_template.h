@@ -18,7 +18,7 @@
  * 平台/运行环境
  * ======================================================================== */
 
-#define EKCFG_RTOS      (0) /**< 是否使用 RTOS (0=裸机) */
+#define EKCFG_RTOS (0) /**< 是否使用 RTOS (0=裸机) */
 /* RTOS 锁配置（EKCFG_RTOS == 1 时需在 ek_conf.h 中定义）：
  * 包含你的 RTOS 头文件，然后定义锁类型和操作宏：
  *   #include "FreeRTOS.h"
@@ -30,8 +30,9 @@
  *   #define EK_LOCK_ACQUIRE(obj) (xSemaphoreTake((obj)->lock, portMAX_DELAY) == pdTRUE)
  *   #define EK_LOCK_RELEASE(obj) xSemaphoreGive((obj)->lock)
  */
-#define EKCFG_PICOLIBC  (0) /**< 是否使用 picolibc 替代标准 libc */
-#define EKCFG_IO_LWPRTF (1) /**< IO 是否使用 lwprintf (1=使用, 0=不使用) */
+#define EKCFG_PICOLIBC     (0) /**< 是否使用 picolibc 替代标准 libc */
+#define EKCFG_IO_LWPRTF    (1) /**< IO 是否使用 lwprintf (1=使用, 0=不使用) */
+#define EKCFG_STATIC_ALLOC (0) /**< 是否开启静态分配 (1=使用, 0=不使用) */
 
 /* ========================================================================
  * 核心服务
@@ -63,6 +64,8 @@
 #define EKCFG_HEAP_SECTION             ".heap" /**< 堆内存所在链接器段 (如 ".tcmram") */
 #define EKCFG_HEAP_TLSF                (1) /**< 内存堆使用 TLSF 分配器 (1=TLSF, 0=自定义) */
 #define EKCFG_HEAP_SIZE                (16 * 1024) /**< 内存堆大小（字节） */
+#define EKCFG_TLSF_FL_INDEX_MAX        (24) /**< TLSF 一级索引最大值，最大连续块为 2 的该值次方字节 */
+#define EKCFG_TLSF_SL_INDEX_COUNT_LOG2 (3) /**< TLSF 二级索引数量的 log2，二级链表数为 2 的该值次方 */
 #define EKCFG_LOG_DEBUG                (1) /**< 启用 DEBUG 级别日志 */
 #define EKCFG_LOG_COLOR                (0) /**< 启用 ANSI 彩色日志 */
 #define EKCFG_LOG_BUF_SIZE             (128) /**< 日志缓冲区大小（字节） */

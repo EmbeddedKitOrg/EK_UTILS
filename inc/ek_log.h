@@ -69,8 +69,8 @@ typedef enum
  * @example
  * EK_LOG_FILE_TAG("main.c");
  */
-#    define EK_LOG_MODULE(tag, level)                          \
-        static const char *_EK_LOG_TAG_ = (tag);                \
+#    define EK_LOG_MODULE(tag, level)            \
+        static const char *_EK_LOG_TAG_ = (tag); \
         static const ek_log_level_t _EK_LOG_MIN_LEVEL_ = (level)
 
 /**

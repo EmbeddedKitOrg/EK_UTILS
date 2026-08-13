@@ -38,18 +38,22 @@
 #ifndef __TLSF_H
 #define __TLSF_H
 
-#include <stddef.h>
+#include "ek_conf_internal.h"
 
-#ifdef __cplusplus
+#if EKCFG_HEAP_TLSF == 1
+
+#    include <stddef.h>
+
+#    ifdef __cplusplus
 extern "C"
 {
-#endif
+#    endif
 
 /* tlsf_t：TLSF 结构体。可以包含 1 到 N 个内存池。 */
 /* pool_t：TLSF 可以管理的一块内存。 */
 typedef void *tlsf_t;
 typedef void *pool_t;
-    
+
 /* 创建/销毁内存池。 */
 tlsf_t tlsf_create(void *mem);
 tlsf_t tlsf_create_with_pool(void *mem, size_t bytes);
@@ -84,8 +88,10 @@ void tlsf_walk_pool(pool_t pool, tlsf_walker walker, void *user);
 int tlsf_check(tlsf_t tlsf);
 int tlsf_check_pool(pool_t pool);
 
-#ifdef __cplusplus
+#    ifdef __cplusplus
 }
-#endif /* __cplusplus */
+#    endif /* __cplusplus */
+
+#endif // EKCFG_HEAP_TLSF == 1
 
 #endif /* __TLSF_H */

@@ -1,17 +1,20 @@
-#include <assert.h>
-#include <limits.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "tlsf.h"
 
-#if defined(__cplusplus)
-#    define tlsf_decl inline
-#else
-#    define tlsf_decl static
-#endif
+#if EKCFG_HEAP_TLSF == 1
+
+#    include "ek_io.h"
+#    include <assert.h>
+#    include <limits.h>
+#    include <stddef.h>
+#    include <stdio.h>
+#    include <stdlib.h>
+#    include <string.h>
+
+#    if defined(__cplusplus)
+#        define tlsf_decl inline
+#    else
+#        define tlsf_decl static
+#    endif
 
 /*
 ** Architecture-specific bit manipulation routines.
@@ -35,18 +38,18 @@
 ** Detect whether or not we are building for a 32- or 64-bit (LP/LLP)
 ** architecture. There is no reliable portable method at compile-time.
 */
-#if defined(__alpha__) || defined(__ia64__) || defined(__x86_64__) || defined(_WIN64) || defined(__LP64__) || \
-    defined(__LLP64__)
-#    define TLSF_64BIT
-#endif
+#    if defined(__alpha__) || defined(__ia64__) || defined(__x86_64__) || defined(_WIN64) || defined(__LP64__) || \
+        defined(__LLP64__)
+#        define TLSF_64BIT
+#    endif
 
 /*
 ** gcc 3.4 and above have builtin support, specialized for architecture.
 ** Some compilers masquerade as gcc; patchlevel test filters them out.
 */
-#if defined(__GNUC__) && (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)) && defined(__GNUC_PATCHLEVEL__)
+#    if defined(__GNUC__) && (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)) && defined(__GNUC_PATCHLEVEL__)
 
-#    if defined(__SNC__)
+#        if defined(__SNC__)
 /* SNC for Playstation 3. */
 
 tlsf_decl int tlsf_ffs(unsigned int word)
@@ -56,14 +59,14 @@ tlsf_decl int tlsf_ffs(unsigned int word)
     return bit - 1;
 }
 
-#    else
+#        else
 
 tlsf_decl int tlsf_ffs(unsigned int word)
 {
     return __builtin_ffs(word) - 1;
 }
 
-#    endif
+#        endif
 
 tlsf_decl int tlsf_fls(unsigned int word)
 {
@@ -71,13 +74,13 @@ tlsf_decl int tlsf_fls(unsigned int word)
     return bit - 1;
 }
 
-#elif defined(_MSC_VER) && (_MSC_VER >= 1400) && (defined(_M_IX86) || defined(_M_X64))
+#    elif defined(_MSC_VER) && (_MSC_VER >= 1400) && (defined(_M_IX86) || defined(_M_X64))
 /* Microsoft Visual C++ support on x86/X64 architectures. */
 
-#    include <intrin.h>
+#        include <intrin.h>
 
-#    pragma intrinsic(_BitScanReverse)
-#    pragma intrinsic(_BitScanForward)
+#        pragma intrinsic(_BitScanReverse)
+#        pragma intrinsic(_BitScanForward)
 
 tlsf_decl int tlsf_fls(unsigned int word)
 {
@@ -91,10 +94,10 @@ tlsf_decl int tlsf_ffs(unsigned int word)
     return _BitScanForward(&index, word) ? index : -1;
 }
 
-#elif defined(_MSC_VER) && defined(_M_PPC)
+#    elif defined(_MSC_VER) && defined(_M_PPC)
 /* Microsoft Visual C++ support on PowerPC architectures. */
 
-#    include <ppcintrinsics.h>
+#        include <ppcintrinsics.h>
 
 tlsf_decl int tlsf_fls(unsigned int word)
 {
@@ -109,7 +112,7 @@ tlsf_decl int tlsf_ffs(unsigned int word)
     return bit - 1;
 }
 
-#elif defined(__ARMCC_VERSION)
+#    elif defined(__ARMCC_VERSION)
 /* RealView Compilation Tools for ARM */
 
 tlsf_decl int tlsf_ffs(unsigned int word)
@@ -125,10 +128,10 @@ tlsf_decl int tlsf_fls(unsigned int word)
     return bit - 1;
 }
 
-#elif defined(__ghs__)
+#    elif defined(__ghs__)
 /* Green Hills support for PowerPC */
 
-#    include <ppc_ghs.h>
+#        include <ppc_ghs.h>
 
 tlsf_decl int tlsf_ffs(unsigned int word)
 {
@@ -143,7 +146,7 @@ tlsf_decl int tlsf_fls(unsigned int word)
     return bit - 1;
 }
 
-#else
+#    else
 /* Fall back to generic implementation. */
 
 tlsf_decl int tlsf_fls_generic(unsigned int word)
@@ -191,10 +194,10 @@ tlsf_decl int tlsf_fls(unsigned int word)
     return tlsf_fls_generic(word) - 1;
 }
 
-#endif
+#    endif
 
 /* Possibly 64-bit version of tlsf_fls. */
-#if defined(TLSF_64BIT)
+#    if defined(TLSF_64BIT)
 tlsf_decl int tlsf_fls_sizet(size_t size)
 {
     int high = (int)(size >> 32);
@@ -209,39 +212,36 @@ tlsf_decl int tlsf_fls_sizet(size_t size)
     }
     return bits;
 }
-#else
-#    define tlsf_fls_sizet tlsf_fls
-#endif
+#    else
+#        define tlsf_fls_sizet tlsf_fls
+#    endif
 
-#undef tlsf_decl
+#    undef tlsf_decl
 
 /*
 ** Constants.
 */
 
-/* Public constants: may be modified. */
+/* 公共常量：通过 ek_conf.h 配置。 */
 enum tlsf_public
 {
-    /* log2 of number of linear subdivisions of block sizes. Larger
-	** values require more memory in the control structure. Values of
-	** 4 or 5 are typical.
-	*/
-    SL_INDEX_COUNT_LOG2 = 3, // 修改这个参数来减小开销 默认是5
+    /* 块大小线性细分数量的 log2。 */
+    SL_INDEX_COUNT_LOG2 = EKCFG_TLSF_SL_INDEX_COUNT_LOG2,
 };
 
 /* Private constants: do not modify. */
 enum tlsf_private
 {
-#if defined(TLSF_64BIT)
+#    if defined(TLSF_64BIT)
     /* All allocation sizes and addresses are aligned to 8 bytes. */
     ALIGN_SIZE_LOG2 = 3,
-#else
+#    else
     /* All allocation sizes and addresses are aligned to 4 bytes. */
     ALIGN_SIZE_LOG2 = 2,
-#endif
+#    endif
     ALIGN_SIZE = (1 << ALIGN_SIZE_LOG2),
 
-/*
+    /*
 	** We support allocations of sizes up to (1 << FL_INDEX_MAX) bits.
 	** However, because we linearly subdivide the second-level lists, and
 	** our minimum size granularity is 4 bytes, it doesn't make sense to
@@ -252,15 +252,7 @@ enum tlsf_private
 	** blocks below that size into the 0th first-level list.
 	*/
 
-#if defined(TLSF_64BIT)
-    /*
-	** TODO: We can increase this to support larger sizes, at the expense
-	** of more overhead in the TLSF structure.
-	*/
-    FL_INDEX_MAX = 32,
-#else
-    FL_INDEX_MAX = 24, // 修改这里让32位的设备的开销更小 默认是30
-#endif
+    FL_INDEX_MAX = EKCFG_TLSF_FL_INDEX_MAX,
     SL_INDEX_COUNT = (1 << SL_INDEX_COUNT_LOG2),
     FL_INDEX_SHIFT = (SL_INDEX_COUNT_LOG2 + ALIGN_SIZE_LOG2),
     FL_INDEX_COUNT = (FL_INDEX_MAX - FL_INDEX_SHIFT + 1),
@@ -272,24 +264,24 @@ enum tlsf_private
 ** Cast and min/max macros.
 */
 
-#define tlsf_cast(t, exp) ((t)(exp))
-#define tlsf_min(a, b)    ((a) < (b) ? (a) : (b))
-#define tlsf_max(a, b)    ((a) > (b) ? (a) : (b))
+#    define tlsf_cast(t, exp) ((t)(exp))
+#    define tlsf_min(a, b)    ((a) < (b) ? (a) : (b))
+#    define tlsf_max(a, b)    ((a) > (b) ? (a) : (b))
 
 /*
 ** Set assert macro, if it has not been provided by the user.
 */
-#if !defined(tlsf_assert)
-#    define tlsf_assert assert
-#endif
+#    if !defined(tlsf_assert)
+#        define tlsf_assert assert
+#    endif
 
 /*
 ** Static assertion mechanism.
 */
 
-#define _tlsf_glue2(x, y)       x##y
-#define _tlsf_glue(x, y)        _tlsf_glue2(x, y)
-#define tlsf_static_assert(exp) typedef char _tlsf_glue(static_assert, __LINE__)[(exp) ? 1 : -1]
+#    define _tlsf_glue2(x, y)       x##y
+#    define _tlsf_glue(x, y)        _tlsf_glue2(x, y)
+#    define tlsf_static_assert(exp) typedef char _tlsf_glue(static_assert, __LINE__)[(exp) ? 1 : -1]
 
 /* This code has been tested on 32- and 64-bit (LP/LLP) architectures. */
 tlsf_static_assert(sizeof(int) * CHAR_BIT == 32);
@@ -830,14 +822,14 @@ typedef struct integrity_t
     int status;
 } integrity_t;
 
-#define tlsf_insist(x)  \
-    {                   \
-        tlsf_assert(x); \
-        if (!(x))       \
-        {               \
-            status--;   \
-        }               \
-    }
+#    define tlsf_insist(x)  \
+        {                   \
+            tlsf_assert(x); \
+            if (!(x))       \
+            {               \
+                status--;   \
+            }               \
+        }
 
 static void integrity_walker(void *ptr, size_t size, int used, void *user)
 {
@@ -908,12 +900,12 @@ int tlsf_check(tlsf_t tlsf)
     return status;
 }
 
-#undef tlsf_insist
+#    undef tlsf_insist
 
 static void default_walker(void *ptr, size_t size, int used, void *user)
 {
     (void)user;
-    printf("\t%p %s size: %x (%p)\n", ptr, used ? "used" : "free", (unsigned int)size, block_from_ptr(ptr));
+    ek_printf("\t%p %s size: %x (%p)\n", ptr, used ? "used" : "free", (unsigned int)size, block_from_ptr(ptr));
 }
 
 void tlsf_walk_pool(pool_t pool, tlsf_walker walker, void *user)
@@ -942,7 +934,7 @@ size_t tlsf_block_size(void *ptr)
 int tlsf_check_pool(pool_t pool)
 {
     /* Check that the blocks are physically correct. */
-    integrity_t integ = {0, 0};
+    integrity_t integ = { 0, 0 };
     tlsf_walk_pool(pool, integrity_walker, &integ);
 
     return integ.status;
@@ -997,21 +989,21 @@ pool_t tlsf_add_pool(tlsf_t tlsf, void *mem, size_t bytes)
 
     if (((ptrdiff_t)mem % ALIGN_SIZE) != 0)
     {
-        printf("tlsf_add_pool: Memory must be aligned by %u bytes.\n", (unsigned int)ALIGN_SIZE);
+        ek_printf("tlsf_add_pool: Memory must be aligned by %u bytes.\n", (unsigned int)ALIGN_SIZE);
         return 0;
     }
 
     if (pool_bytes < block_size_min || pool_bytes > block_size_max)
     {
-#if defined(TLSF_64BIT)
-        printf("tlsf_add_pool: Memory size must be between 0x%x and 0x%x00 bytes.\n",
-               (unsigned int)(pool_overhead + block_size_min),
-               (unsigned int)((pool_overhead + block_size_max) / 256));
-#else
-        printf("tlsf_add_pool: Memory size must be between %u and %u bytes.\n",
-               (unsigned int)(pool_overhead + block_size_min),
-               (unsigned int)(pool_overhead + block_size_max));
-#endif
+#    if defined(TLSF_64BIT)
+        ek_printf("tlsf_add_pool: Memory size must be between 0x%x and 0x%x00 bytes.\n",
+                  (unsigned int)(pool_overhead + block_size_min),
+                  (unsigned int)((pool_overhead + block_size_max) / 256));
+#    else
+        ek_printf("tlsf_add_pool: Memory size must be between %u and %u bytes.\n",
+                  (unsigned int)(pool_overhead + block_size_min),
+                  (unsigned int)(pool_overhead + block_size_max));
+#    endif
         return 0;
     }
 
@@ -1054,7 +1046,7 @@ void tlsf_remove_pool(tlsf_t tlsf, pool_t pool)
 ** TLSF main interface.
 */
 
-#if _DEBUG
+#    if _DEBUG
 int test_ffs_fls()
 {
     /* Verify ffs/fls work properly. */
@@ -1068,32 +1060,32 @@ int test_ffs_fls()
     rv += (tlsf_fls(0x80000008) == 31) ? 0 : 0x40;
     rv += (tlsf_fls(0x7FFFFFFF) == 30) ? 0 : 0x80;
 
-#    if defined(TLSF_64BIT)
+#        if defined(TLSF_64BIT)
     rv += (tlsf_fls_sizet(0x80000000) == 31) ? 0 : 0x100;
     rv += (tlsf_fls_sizet(0x100000000) == 32) ? 0 : 0x200;
     rv += (tlsf_fls_sizet(0xffffffffffffffff) == 63) ? 0 : 0x400;
-#    endif
+#        endif
 
     if (rv)
     {
-        printf("test_ffs_fls: %x ffs/fls tests failed.\n", rv);
+        ek_printf("test_ffs_fls: %x ffs/fls tests failed.\n", rv);
     }
     return rv;
 }
-#endif
+#    endif
 
 tlsf_t tlsf_create(void *mem)
 {
-#if _DEBUG
+#    if _DEBUG
     if (test_ffs_fls())
     {
         return 0;
     }
-#endif
+#    endif
 
     if (((tlsfptr_t)mem % ALIGN_SIZE) != 0)
     {
-        printf("tlsf_create: Memory must be aligned to %u bytes.\n", (unsigned int)ALIGN_SIZE);
+        ek_printf("tlsf_create: Memory must be aligned to %u bytes.\n", (unsigned int)ALIGN_SIZE);
         return 0;
     }
 
@@ -1267,3 +1259,5 @@ void *tlsf_realloc(tlsf_t tlsf, void *ptr, size_t size)
 
     return p;
 }
+
+#endif // EKCFG_HEAP_TLSF == 1

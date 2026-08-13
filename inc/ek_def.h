@@ -15,6 +15,7 @@
 #ifndef EK_DEF_H
 #define EK_DEF_H
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
@@ -101,10 +102,11 @@
 #endif
 
 /* ========== 功能宏 ========== */
-#define EK_FREQ_K(x)            ((x) * 1000UL)
-#define EK_FREQ_M(x)            ((x) * 1000UL * 1000UL)
-#define EK_ARRAY_LEN(x)         (sizeof(x) / (sizeof((x)[0])))
-#define EK_CLAMP(val, min, max) (((val) < (min)) ? (min) : (((val) > (max)) ? (max) : (val)))
+#define EK_STATIC_ASSERT(expr, msg) static_assert(expr, msg)
+#define EK_FREQ_K(x)                ((x) * 1000UL)
+#define EK_FREQ_M(x)                ((x) * 1000UL * 1000UL)
+#define EK_ARRAY_LEN(x)             (sizeof(x) / (sizeof((x)[0])))
+#define EK_CLAMP(val, min, max)     (((val) < (min)) ? (min) : (((val) > (max)) ? (max) : (val)))
 #define EK_GET_FILE_NAME(file_path)                            \
     (strrchr((file_path), '/') ? strrchr((file_path), '/') + 1 \
                                : (strrchr((file_path), '\\') ? strrchr((file_path), '\\') + 1 : (file_path)))

@@ -65,6 +65,8 @@ void ek_io_init(void);
 
 #else
 
+#    include <stdio.h>
+
 void ek_io_init(void);
 
 #    define EK_IO_FPUTC()

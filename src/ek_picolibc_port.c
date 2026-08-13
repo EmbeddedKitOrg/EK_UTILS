@@ -58,7 +58,6 @@ static int _ek_picolibc_putc(char ch, FILE *file)
     return ek_port_io_fputc(ch);
 }
 
-
 static FILE __stdio = FDEV_SETUP_STREAM(_ek_picolibc_putc, NULL, NULL, _FDEV_SETUP_WRITE);
 
 FILE *const stdout = &__stdio;

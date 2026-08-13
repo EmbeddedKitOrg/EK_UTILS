@@ -34,16 +34,19 @@
 #ifndef LWPRINTF_HDR_H
 #define LWPRINTF_HDR_H
 
-#include <limits.h>
-#include <stdarg.h>
-#include <stdint.h>
-#include <string.h>
-#include "lwprintf_opt.h"
+#include "ek_conf_internal.h"
 
-#ifdef __cplusplus
+#if EKCFG_IO_LWPRTF == 1
+
+#    include <limits.h>
+#    include <stdarg.h>
+#    include <stdint.h>
+#    include <string.h>
+#    include "lwprintf_opt.h"
+#    ifdef __cplusplus
 extern "C"
 {
-#endif /* __cplusplus */
+#    endif /* __cplusplus */
 
 /**
  * \defgroup        LWPRINTF 轻量级标准输入输出管理器
@@ -55,14 +58,14 @@ extern "C"
  * \brief           未使用变量宏
  * \param[in]       x: 未使用的变量
  */
-#define LWPRINTF_UNUSED(x) ((void)(x))
+#    define LWPRINTF_UNUSED(x) ((void)(x))
 
 /**
  * \brief           计算静态分配数组的大小
  * \param[in]       x: 输入数组
  * \return          数组元素的数量
  */
-#define LWPRINTF_ARRAYSIZE(x) (sizeof(x) / sizeof((x)[0]))
+#    define LWPRINTF_ARRAYSIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 /**
  * \brief           LwPRINTF 实例的前向声明
@@ -84,9 +87,9 @@ typedef struct lwprintf_s
 {
     lwprintf_output_fn out_fn; /*!< 用于直接打印操作的输出函数 */
     void *arg; /*!< 自定义用户参数 */
-#if LWPRINTF_CFG_OS || __DOXYGEN__
+#    if LWPRINTF_CFG_OS || __DOXYGEN__
     LWPRINTF_CFG_OS_MUTEX_HANDLE mutex; /*!< 操作系统互斥锁句柄 */
-#endif /* LWPRINTF_CFG_OS || __DOXYGEN__ */
+#    endif /* LWPRINTF_CFG_OS || __DOXYGEN__ */
 } lwprintf_t;
 
 uint8_t lwprintf_init_ex(lwprintf_t *lwobj, lwprintf_output_fn out_fn);
@@ -98,8 +101,8 @@ uint8_t lwprintf_protect_ex(lwprintf_t *const lwobj);
 uint8_t lwprintf_unprotect_ex(lwprintf_t *const lwobj);
 
 /* Argument management */
-#define lwprintf_set_arg(lwobj, argval) (lwobj)->arg = (argval)
-#define lwprintf_get_arg(lwobj)         ((lwobj)->arg)
+#    define lwprintf_set_arg(lwobj, argval) (lwobj)->arg = (argval)
+#    define lwprintf_get_arg(lwobj)         ((lwobj)->arg)
 
 /**
  * \brief           将可变参数列表中的格式化数据写入指定大小的缓冲区
@@ -110,7 +113,8 @@ uint8_t lwprintf_unprotect_ex(lwprintf_t *const lwobj);
  * \param[in]       ...: 格式字符串的可选参数
  * \return          本应写入的字符数量，不包括终止空字符
  */
-#define lwprintf_sprintf_ex(lwobj, s, format, ...) lwprintf_snprintf_ex((lwobj), (s), SIZE_MAX, (format), ##__VA_ARGS__)
+#    define lwprintf_sprintf_ex(lwobj, s, format, ...) \
+        lwprintf_snprintf_ex((lwobj), (s), SIZE_MAX, (format), ##__VA_ARGS__)
 
 /**
  * \brief           初始化默认的 LwPRINTF 实例
@@ -118,7 +122,7 @@ uint8_t lwprintf_unprotect_ex(lwprintf_t *const lwobj);
  * \return          成功时返回 `1`，否则返回 `0`
  * \sa              lwprintf_init_ex
  */
-#define lwprintf_init(out_fn) lwprintf_init_ex(NULL, (out_fn))
+#    define lwprintf_init(out_fn) lwprintf_init_ex(NULL, (out_fn))
 
 /**
  * \brief           使用默认 LwPRINTF 实例将可变参数列表中的格式化数据打印到输出
@@ -127,7 +131,7 @@ uint8_t lwprintf_unprotect_ex(lwprintf_t *const lwobj);
  *                      `va_list` 是在 `<cstdarg>` 中定义的特殊类型
  * \return          如果 `n` 足够大，本应写入的字符数量，不包括终止空字符
  */
-#define lwprintf_vprintf(format, arg) lwprintf_vprintf_ex(NULL, (format), (arg))
+#    define lwprintf_vprintf(format, arg) lwprintf_vprintf_ex(NULL, (format), (arg))
 
 /**
  * \brief           使用默认 LwPRINTF 实例将格式化数据打印到输出
@@ -135,7 +139,7 @@ uint8_t lwprintf_unprotect_ex(lwprintf_t *const lwobj);
  * \param[in]       ...: 格式字符串的可选参数
  * \return          如果 `n` 足够大，本应写入的字符数量，不包括终止空字符
  */
-#define lwprintf_printf(format, ...) lwprintf_printf_ex(NULL, (format), ##__VA_ARGS__)
+#    define lwprintf_printf(format, ...) lwprintf_printf_ex(NULL, (format), ##__VA_ARGS__)
 
 /**
  * \brief           使用默认 LwPRINTF 实例将可变参数列表中的格式化数据写入指定大小的缓冲区
@@ -148,7 +152,7 @@ uint8_t lwprintf_unprotect_ex(lwprintf_t *const lwobj);
  *                      `va_list` 是在 `<cstdarg>` 中定义的特殊类型
  * \return          如果 `n` 足够大，本应写入的字符数量，不包括终止空字符
  */
-#define lwprintf_vsnprintf(s, n, format, arg) lwprintf_vsnprintf_ex(NULL, (s), (n), (format), (arg))
+#    define lwprintf_vsnprintf(s, n, format, arg) lwprintf_vsnprintf_ex(NULL, (s), (n), (format), (arg))
 
 /**
  * \brief           使用默认 LwPRINTF 实例将可变参数列表中的格式化数据写入指定大小的缓冲区
@@ -160,7 +164,7 @@ uint8_t lwprintf_unprotect_ex(lwprintf_t *const lwobj);
  * \param[in]       ...: 格式字符串的可选参数
  * \return          如果 `n` 足够大，本应写入的字符数量，不包括终止空字符
  */
-#define lwprintf_snprintf(s, n, format, ...) lwprintf_snprintf_ex(NULL, (s), (n), (format), ##__VA_ARGS__)
+#    define lwprintf_snprintf(s, n, format, ...) lwprintf_snprintf_ex(NULL, (s), (n), (format), ##__VA_ARGS__)
 
 /**
  * \brief           使用默认 LwPRINTF 实例将可变参数列表中的格式化数据写入指定大小的缓冲区
@@ -170,100 +174,100 @@ uint8_t lwprintf_unprotect_ex(lwprintf_t *const lwobj);
  * \param[in]       ...: 格式字符串的可选参数
  * \return          本应写入的字符数量，不包括终止空字符
  */
-#define lwprintf_sprintf(s, format, ...) lwprintf_sprintf_ex(NULL, (s), (format), ##__VA_ARGS__)
+#    define lwprintf_sprintf(s, format, ...) lwprintf_sprintf_ex(NULL, (s), (format), ##__VA_ARGS__)
 
 /**
  * \brief           手动启用互斥锁
  * \return          如果已保护返回 `1`，否则返回 `0`
  */
-#define lwprintf_protect() lwprintf_protect_ex(NULL)
+#    define lwprintf_protect() lwprintf_protect_ex(NULL)
 
 /**
  * \brief           手动禁用互斥锁
  * \return          如果已保护返回 `1`，否则返回 `0`
  */
-#define lwprintf_unprotect() lwprintf_unprotect_ex(NULL)
+#    define lwprintf_unprotect() lwprintf_unprotect_ex(NULL)
 
-#if LWPRINTF_CFG_ENABLE_SHORTNAMES || __DOXYGEN__
+#    if LWPRINTF_CFG_ENABLE_SHORTNAMES || __DOXYGEN__
 
 /**
  * \copydoc         lwprintf_printf
  * \note            此函数等同于 \ref lwprintf_printf
  *                      仅在启用 \ref LWPRINTF_CFG_ENABLE_SHORTNAMES 时可用
  */
-#    define lwprintf lwprintf_printf
+#        define lwprintf lwprintf_printf
 
 /**
  * \copydoc         lwprintf_vprintf
  * \note            此函数等同于 \ref lwprintf_vprintf
  *                      仅在启用 \ref LWPRINTF_CFG_ENABLE_SHORTNAMES 时可用
  */
-#    define lwvprintf lwprintf_vprintf
+#        define lwvprintf lwprintf_vprintf
 
 /**
  * \copydoc         lwprintf_vsnprintf
  * \note            此函数等同于 \ref lwprintf_vsnprintf
  *                      仅在启用 \ref LWPRINTF_CFG_ENABLE_SHORTNAMES 时可用
  */
-#    define lwvsnprintf lwprintf_vsnprintf
+#        define lwvsnprintf lwprintf_vsnprintf
 
 /**
  * \copydoc         lwprintf_snprintf
  * \note            此函数等同于 \ref lwprintf_snprintf
  *                      仅在启用 \ref LWPRINTF_CFG_ENABLE_SHORTNAMES 时可用
  */
-#    define lwsnprintf lwprintf_snprintf
+#        define lwsnprintf lwprintf_snprintf
 
 /**
  * \copydoc         lwprintf_sprintf
  * \note            此函数等同于 \ref lwprintf_sprintf
  *                      仅在启用 \ref LWPRINTF_CFG_ENABLE_SHORTNAMES 时可用
  */
-#    define lwsprintf lwprintf_sprintf
+#        define lwsprintf lwprintf_sprintf
 
-#endif /* LWPRINTF_CFG_ENABLE_SHORTNAMES || __DOXYGEN__ */
+#    endif /* LWPRINTF_CFG_ENABLE_SHORTNAMES || __DOXYGEN__ */
 
-#if LWPRINTF_CFG_ENABLE_STD_NAMES || __DOXYGEN__
+#    if LWPRINTF_CFG_ENABLE_STD_NAMES || __DOXYGEN__
 
 /**
  * \copydoc         lwprintf_printf
  * \note            此函数等同于 \ref lwprintf_printf
  *                      仅在启用 \ref LWPRINTF_CFG_ENABLE_STD_NAMES 时可用
  */
-#    define printf lwprintf_printf
+#        define printf lwprintf_printf
 
 /**
  * \copydoc         lwprintf_vprintf
  * \note            此函数等同于 \ref lwprintf_vprintf
  *                      仅在启用 \ref LWPRINTF_CFG_ENABLE_STD_NAMES 时可用
  */
-#    define vprintf lwprintf_vprintf
+#        define vprintf lwprintf_vprintf
 
 /**
  * \copydoc         lwprintf_vsnprintf
  * \note            此函数等同于 \ref lwprintf_vsnprintf
  *                      仅在启用 \ref LWPRINTF_CFG_ENABLE_STD_NAMES 时可用
  */
-#    define vsnprintf lwprintf_vsnprintf
+#        define vsnprintf lwprintf_vsnprintf
 
 /**
  * \copydoc         lwprintf_snprintf
  * \note            此函数等同于 \ref lwprintf_snprintf
  *                      仅在启用 \ref LWPRINTF_CFG_ENABLE_STD_NAMES 时可用
  */
-#    define snprintf lwprintf_snprintf
+#        define snprintf lwprintf_snprintf
 
 /**
  * \copydoc         lwprintf_sprintf
  * \note            此函数等同于 \ref lwprintf_sprintf
  *                      仅在启用 \ref LWPRINTF_CFG_ENABLE_STD_NAMES 时可用
  */
-#    define sprintf lwprintf_sprintf
+#        define sprintf lwprintf_sprintf
 
-#endif /* LWPRINTF_CFG_ENABLE_STD_NAMES || __DOXYGEN__ */
+#    endif /* LWPRINTF_CFG_ENABLE_STD_NAMES || __DOXYGEN__ */
 
 /* Debug module */
-#if !defined(NDEBUG)
+#    if !defined(NDEBUG)
 /**
  * \brief           调试输出函数
  *
@@ -275,7 +279,7 @@ uint8_t lwprintf_unprotect_ex(lwprintf_t *const lwobj);
  * \param[in]       fmt: 格式化文本
  * \param[in]       ...: 可选的格式化参数
  */
-#    define lwprintf_debug(fmt, ...) lwprintf_printf((fmt), ##__VA_ARGS__)
+#        define lwprintf_debug(fmt, ...) lwprintf_printf((fmt), ##__VA_ARGS__)
 /**
  * \brief           条件调试输出
  *
@@ -290,25 +294,27 @@ uint8_t lwprintf_unprotect_ex(lwprintf_t *const lwobj);
  * \param[in]       fmt: 格式化文本
  * \param[in]       ...: 可选的格式化参数
  */
-#    define lwprintf_debug_cond(cond, fmt, ...)      \
-        do                                           \
-        {                                            \
-            if ((cond))                              \
-            {                                        \
-                lwprintf_debug((fmt), ##__VA_ARGS__) \
-            }                                        \
-        } while (0)
-#else
-#    define lwprintf_debug(fmt, ...)            ((void)0)
-#    define lwprintf_debug_cond(cond, fmt, ...) ((void)0)
-#endif
+#        define lwprintf_debug_cond(cond, fmt, ...)      \
+            do                                           \
+            {                                            \
+                if ((cond))                              \
+                {                                        \
+                    lwprintf_debug((fmt), ##__VA_ARGS__) \
+                }                                        \
+            } while (0)
+#    else
+#        define lwprintf_debug(fmt, ...)            ((void)0)
+#        define lwprintf_debug_cond(cond, fmt, ...) ((void)0)
+#    endif
 
 /**
  * \}
  */
 
-#ifdef __cplusplus
+#    ifdef __cplusplus
 }
-#endif /* __cplusplus */
+#    endif /* __cplusplus */
+
+#endif /* EKCFG_IO_LWPRTF == 1 */
 
 #endif /* LWPRINTF_HDR_H */
