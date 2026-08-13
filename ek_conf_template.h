@@ -72,5 +72,6 @@
 #define EKCFG_ASSERT_TINY              (1) /**< 使用轻量级断言模式 */
 #define EKCFG_ASSERT_LOG               (1) /**< 断言失败时输出日志 */
 #define EKCFG_EVOKE_MIN_DEEPSLEEP_TICK (10) /**< 进入深度睡眠最小 tick */
+#define EKCFG_PT_PRIO_LOWEST           (31) /**< 微线程最低优先级，就绪队列档位数为该值 + 1 */
 
 #endif /* EK_CONF_H */

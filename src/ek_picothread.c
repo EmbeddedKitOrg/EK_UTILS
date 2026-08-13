@@ -5,17 +5,21 @@
 #    include "ek_assert.h"
 #    include "ek_export.h"
 
-__EK_STATIC_INLINE void _insert_state_by_prio(ek_list_node_t *list, ek_pt_t *pt);
+__EK_STATIC_INLINE void _ready_enqueue(ek_pt_t *pt);
+__EK_STATIC_INLINE void _ready_dequeue(ek_pt_t *pt);
 __EK_STATIC_INLINE void _insert_event_by_prio(ek_list_node_t *list, ek_pt_t *pt);
 __EK_STATIC_INLINE void _insert_state_by_time(ek_list_node_t *list, ek_pt_t *pt);
 static ek_pt_t *_pt_next_ready(void);
 
+#    define PT_PRIO_LEVELS ((uint8_t)(EKCFG_PT_PRIO_LOWEST + 1U))
+
 volatile static bool s_init = false;
-static ek_list_node_t s_ready_list; // 就绪链表
-static ek_list_node_t s_block_list; // 阻塞链表
-static ek_pt_t *s_cur_pt; // 当前正在运行的线程
-static ek_pt_t *s_next_pt; // 下一个就绪的任务
-static uint32_t s_schedule_now; // 当前调度基准 tick
+static ek_list_node_t s_ready_list[PT_PRIO_LEVELS];
+static uint32_t s_ready_mask;
+static ek_list_node_t s_block_list;
+static ek_pt_t *s_cur_pt;
+static ek_pt_t *s_next_pt;
+static uint32_t s_schedule_now;
 
 void ek_pt_init(void)
 {
@@ -24,7 +28,8 @@ void ek_pt_init(void)
         return;
     }
     s_init = true;
-    ek_list_init(&s_ready_list);
+    s_ready_mask = 0U;
+    for (uint8_t i = 0; i < PT_PRIO_LEVELS; i++) ek_list_init(&s_ready_list[i]);
     ek_list_init(&s_block_list);
 }
 
@@ -33,7 +38,7 @@ EK_EXPORT_COMPONENTS(ek_pt_init, 0);
 #    if EKCFG_STATIC_ALLOC == 1
 ek_err_t ek_pt_init_static(ek_pt_t *pt, ek_pt_cb_t cb, uint8_t prio, void *arg)
 {
-    if (pt == NULL || cb == NULL || s_init == false) return EK_ERR_INVAL;
+    if (pt == NULL || cb == NULL || s_init == false || prio > EKCFG_PT_PRIO_LOWEST) return EK_ERR_INVAL;
 
     pt->cb = cb;
     pt->arg = arg;
@@ -53,7 +58,7 @@ ek_err_t ek_pt_init_static(ek_pt_t *pt, ek_pt_cb_t cb, uint8_t prio, void *arg)
     pt->wait_msg = NULL;
 #        endif
 
-    _insert_state_by_prio(&s_ready_list, pt);
+    _ready_enqueue(pt);
     return EK_ERR_NONE;
 }
 
@@ -61,10 +66,8 @@ void ek_pt_deinit_static(ek_pt_t *pt)
 {
     if (pt == NULL || pt == s_cur_pt) return;
 
-    if (pt->state == EK_PT_STATE_READY || pt->state == EK_PT_STATE_BLOCK)
-    {
-        ek_list_remove(&pt->state_node);
-    }
+    if (pt->state == EK_PT_STATE_READY) _ready_dequeue(pt);
+    else if (pt->state == EK_PT_STATE_BLOCK) ek_list_remove(&pt->state_node);
 #        if EKCFG_PICOTHREAD_SEM
     if (pt->wait_sem != NULL)
     {
@@ -90,6 +93,7 @@ ek_pt_handle_t ek_pt_create(ek_pt_cb_t cb, uint8_t prio, void *arg)
 {
     ek_assert_param(s_init == true);
     ek_assert_param(cb != NULL);
+    ek_assert_param(prio <= EKCFG_PT_PRIO_LOWEST);
     ek_pt_t *pt = ek_malloc(sizeof(*pt));
     ek_assert_param(pt != NULL);
     pt->cb = cb;
@@ -110,7 +114,7 @@ ek_pt_handle_t ek_pt_create(ek_pt_cb_t cb, uint8_t prio, void *arg)
     pt->wait_msg = NULL;
 #    endif /* EKCFG_PICOTHREAD_MSG */
 
-    _insert_state_by_prio(&s_ready_list, pt);
+    _ready_enqueue(pt);
 
     return pt;
 }
@@ -120,11 +124,8 @@ void ek_pt_destroy(ek_pt_handle_t pt)
     ek_assert_param(pt != NULL);
     ek_assert_param(pt != s_cur_pt);
 
-    // 从状态链表移除（就绪或阻塞）
-    if (pt->state == EK_PT_STATE_READY || pt->state == EK_PT_STATE_BLOCK)
-    {
-        ek_list_remove(&pt->state_node);
-    }
+    if (pt->state == EK_PT_STATE_READY) _ready_dequeue(pt);
+    else if (pt->state == EK_PT_STATE_BLOCK) ek_list_remove(&pt->state_node);
 
 #    if EKCFG_PICOTHREAD_SEM
     // 从信号量等待链表移除
@@ -185,7 +186,7 @@ uint32_t ek_pt_schedule(uint32_t now)
         }
 #        endif
 #    endif
-        _insert_state_by_prio(&s_ready_list, pt);
+        _ready_enqueue(pt);
     }
 
     // 取下一个就绪任务
@@ -198,7 +199,7 @@ uint32_t ek_pt_schedule(uint32_t now)
     else
     {
         s_cur_pt = s_next_pt;
-        ek_list_remove(&s_cur_pt->state_node);
+        _ready_dequeue(s_cur_pt);
         s_cur_pt->state = EK_PT_STATE_RUNNING;
         s_cur_pt->cb(s_cur_pt, s_cur_pt->arg);
 
@@ -206,7 +207,7 @@ uint32_t ek_pt_schedule(uint32_t now)
         if (s_cur_pt->state == EK_PT_STATE_RUNNING)
         {
             s_cur_pt->state = EK_PT_STATE_READY;
-            _insert_state_by_prio(&s_ready_list, s_cur_pt);
+            _ready_enqueue(s_cur_pt);
         }
         else if (s_cur_pt->state == EK_PT_STATE_BLOCK)
         {
@@ -215,7 +216,7 @@ uint32_t ek_pt_schedule(uint32_t now)
     }
 
     // 有就绪任务则返回当前 tick，主循环不应睡眠
-    if (!ek_list_is_empty(&s_ready_list)) return s_schedule_now;
+    if (s_ready_mask != 0U) return s_schedule_now;
 
     // 返回阻塞链表最早唤醒 tick
     // 空则 0 表示可无限休眠
@@ -236,10 +237,8 @@ void ek_pt_block(ek_pt_handle_t pt, uint32_t xtick)
         return;
     }
 
-    if (pt->state == EK_PT_STATE_READY || pt->state == EK_PT_STATE_BLOCK)
-    {
-        ek_list_remove(&pt->state_node);
-    }
+    if (pt->state == EK_PT_STATE_READY) _ready_dequeue(pt);
+    else if (pt->state == EK_PT_STATE_BLOCK) ek_list_remove(&pt->state_node);
     pt->state = EK_PT_STATE_BLOCK;
     _insert_state_by_time(&s_block_list, pt);
 }
@@ -258,10 +257,8 @@ ek_pt_handle_t ek_pt_suspend(ek_pt_handle_t pt)
         return pt_to_suspend;
     }
 
-    if (pt_to_suspend->state == EK_PT_STATE_READY || pt_to_suspend->state == EK_PT_STATE_BLOCK)
-    {
-        ek_list_remove(&pt_to_suspend->state_node);
-    }
+    if (pt_to_suspend->state == EK_PT_STATE_READY) _ready_dequeue(pt_to_suspend);
+    else if (pt_to_suspend->state == EK_PT_STATE_BLOCK) ek_list_remove(&pt_to_suspend->state_node);
     pt_to_suspend->state = EK_PT_STATE_SUSPEND;
     return NULL;
 }
@@ -273,7 +270,7 @@ void ek_pt_resume(ek_pt_handle_t pt)
     ek_assert_param(pt->state == EK_PT_STATE_SUSPEND);
 
     pt->state = EK_PT_STATE_READY;
-    _insert_state_by_prio(&s_ready_list, pt);
+    _ready_enqueue(pt);
 }
 
 ek_pt_handle_t ek_pt_active(void)
@@ -303,7 +300,7 @@ void ek_pt_sem_deinit_static(ek_pt_sem_t *sem)
         ek_list_remove(&pt->state_node);
         pt->wait_sem = NULL;
         pt->wait_result = EK_ERR_ABORTED;
-        _insert_state_by_prio(&s_ready_list, pt);
+        _ready_enqueue(pt);
         pt->state = EK_PT_STATE_READY;
     }
 }
@@ -331,7 +328,7 @@ void ek_pt_sem_destroy(ek_pt_sem_handle_t sem)
         ek_list_remove(&pt->state_node);
         pt->wait_sem = NULL;
         pt->wait_result = EK_ERR_ABORTED;
-        _insert_state_by_prio(&s_ready_list, pt);
+        _ready_enqueue(pt);
         pt->state = EK_PT_STATE_READY;
     }
 
@@ -369,7 +366,7 @@ void ek_pt_sem_give(ek_pt_sem_handle_t sem)
         ek_list_remove(&pt->state_node);
         pt->wait_sem = NULL;
         pt->wait_result = EK_ERR_NONE;
-        _insert_state_by_prio(&s_ready_list, pt);
+        _ready_enqueue(pt);
         pt->state = EK_PT_STATE_READY;
         return;
     }
@@ -405,7 +402,7 @@ void ek_pt_msg_deinit_static(ek_pt_msg_t *msg)
         ek_list_remove(&pt->state_node);
         pt->wait_msg = NULL;
         pt->wait_result = EK_ERR_ABORTED;
-        _insert_state_by_prio(&s_ready_list, pt);
+        _ready_enqueue(pt);
         pt->state = EK_PT_STATE_READY;
     }
 
@@ -416,7 +413,7 @@ void ek_pt_msg_deinit_static(ek_pt_msg_t *msg)
         ek_list_remove(&pt->state_node);
         pt->wait_msg = NULL;
         pt->wait_result = EK_ERR_ABORTED;
-        _insert_state_by_prio(&s_ready_list, pt);
+        _ready_enqueue(pt);
         pt->state = EK_PT_STATE_READY;
     }
 
@@ -461,7 +458,7 @@ void ek_pt_msg_destroy(ek_pt_msg_handle_t msg)
         ek_list_remove(&pt->state_node);
         pt->wait_msg = NULL;
         pt->wait_result = EK_ERR_ABORTED;
-        _insert_state_by_prio(&s_ready_list, pt);
+        _ready_enqueue(pt);
         pt->state = EK_PT_STATE_READY;
     }
 
@@ -472,7 +469,7 @@ void ek_pt_msg_destroy(ek_pt_msg_handle_t msg)
         ek_list_remove(&pt->state_node);
         pt->wait_msg = NULL;
         pt->wait_result = EK_ERR_ABORTED;
-        _insert_state_by_prio(&s_ready_list, pt);
+        _ready_enqueue(pt);
         pt->state = EK_PT_STATE_READY;
     }
 
@@ -498,7 +495,7 @@ bool ek_pt_msg_send(ek_pt_msg_handle_t msg, const void *data)
             ek_list_remove(&pt->state_node);
             pt->wait_msg = NULL;
             pt->wait_result = EK_ERR_NONE;
-            _insert_state_by_prio(&s_ready_list, pt);
+            _ready_enqueue(pt);
             pt->state = EK_PT_STATE_READY;
         }
         return true;
@@ -527,7 +524,7 @@ bool ek_pt_msg_recv(ek_pt_msg_handle_t msg, void *data)
             ek_list_remove(&pt->state_node);
             pt->wait_msg = NULL;
             pt->wait_result = EK_ERR_NONE;
-            _insert_state_by_prio(&s_ready_list, pt);
+            _ready_enqueue(pt);
             pt->state = EK_PT_STATE_READY;
         }
         return true;
@@ -541,24 +538,18 @@ bool ek_pt_msg_recv(ek_pt_msg_handle_t msg, void *data)
 
 #    endif /* EKCFG_PICOTHREAD_MSG */
 
-__EK_STATIC_INLINE void _insert_state_by_prio(ek_list_node_t *list, ek_pt_t *pt)
+__EK_STATIC_INLINE void _ready_enqueue(ek_pt_t *pt)
 {
-    if (ek_list_is_empty(list))
-    {
-        ek_list_insert_head(list, &pt->state_node);
-        return;
-    }
-    ek_list_node_t *i;
-    ek_list_foreach(i, list)
-    {
-        ek_pt_t *cur_pt = ek_list_container(i, ek_pt_t, state_node);
-        if (cur_pt->prio > pt->prio)
-        {
-            ek_list_insert_before(i, &pt->state_node);
-            return;
-        }
-    }
-    ek_list_insert_tail(list, &pt->state_node);
+    const uint8_t prio = pt->prio;
+    ek_list_insert_tail(&s_ready_list[prio], &pt->state_node);
+    s_ready_mask |= (1UL << prio);
+}
+
+__EK_STATIC_INLINE void _ready_dequeue(ek_pt_t *pt)
+{
+    const uint8_t prio = pt->prio;
+    ek_list_remove(&pt->state_node);
+    if (ek_list_is_empty(&s_ready_list[prio])) s_ready_mask &= ~(1UL << prio);
 }
 
 __EK_STATIC_INLINE void _insert_event_by_prio(ek_list_node_t *list, ek_pt_t *pt)
@@ -603,11 +594,9 @@ __EK_STATIC_INLINE void _insert_state_by_time(ek_list_node_t *list, ek_pt_t *pt)
 
 static ek_pt_t *_pt_next_ready(void)
 {
-    if (ek_list_is_empty(&s_ready_list))
-    {
-        return NULL;
-    }
-    ek_list_node_t *head = ek_list_get_first(&s_ready_list);
+    if (s_ready_mask == 0U) return NULL;
+    const uint8_t prio = (uint8_t)__builtin_ctz(s_ready_mask);
+    ek_list_node_t *head = ek_list_get_first(&s_ready_list[prio]);
     return ek_list_container(head, ek_pt_t, state_node);
 }
 

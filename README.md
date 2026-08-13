@@ -31,6 +31,7 @@ ek_utils/
 │   ├── ek_stack.h                 # 通用 LIFO 栈
 │   ├── ek_str.h                   # 动态字符串
 │   ├── ek_export.h                # 函数自动导出初始化（类似 Linux initcall）
+│   ├── ek_static_alloc.h          # 静态对象自动注册与初始化
 │   ├── ek_evoke.h                 # 协作式事件驱动任务调度器
 │   └── ek_picothread.h            # 微线程 + 信号量 + 消息队列
 ├── src/                           # 源文件
@@ -44,6 +45,7 @@ ek_utils/
 │   ├── ek_picolibc_port.c          # picolibc 适配层
 │   ├── ek_ringbuf.c
 │   ├── ek_stack.c
+│   ├── ek_static_alloc.c
 │   └── ek_str.c
 ├── third_party/                   # 第三方代码
 │   ├── tlsf/                       # TLSF 实时内存分配器（O(1) 分配/释放）
@@ -69,8 +71,9 @@ ek_utils/
 | `ek_stack` | `EKCFG_STACK` | 数据结构 | 通用 LIFO 栈 |
 | `ek_str` | `EKCFG_STR` | 数据结构 | 自动扩容的动态字符串 |
 | `ek_export` | `EKCFG_EXPORT` | 系统服务 | 基于链接器段的自动初始化（需配合链接脚本） |
+| `ek_static_alloc` | `EKCFG_STATIC_ALLOC` | 系统服务 | 静态对象自动注册（`EK_DEFINE_*` → `.ek_static_alloc` 段） |
 | `ek_evoke` | `EKCFG_EVOKE` | 系统服务 | 协作式事件驱动调度器（仅裸机，`EKCFG_RTOS=0` 时可用） |
-| `ek_picothread` | `EKCFG_PICOTHREAD` | 系统服务 | 协作式微线程调度器（protothread，优先级就绪/阻塞链表） |
+| `ek_picothread` | `EKCFG_PICOTHREAD` | 系统服务 | 协作式微线程调度器（protothread，分级 FIFO 就绪队列） |
 | `ek_picothread_sem` | `EKCFG_PICOTHREAD_SEM` | 系统服务 | 微线程信号量（依赖 `ek_picothread`） |
 | `ek_picothread_msg` | `EKCFG_PICOTHREAD_MSG` | 系统服务 | 微线程消息队列（依赖 `ek_picothread` + `ek_ringbuf`） |
 
@@ -203,9 +206,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)
 
 ```c
 // 平台/运行环境（IO 后端三选一，详见"IO 后端选择"）
-#define EKCFG_RTOS      (0)     // 是否使用 RTOS
-#define EKCFG_PICOLIBC  (1)     // 是否使用 picolibc（内部默认 1；模板默认 0。=1 时自动关闭 lwprintf）
-#define EKCFG_IO_LWPRTF (0)     // IO 是否使用 lwprintf（内部默认 0；模板默认 1。两者均 0 时需在 ek_conf.h 自行定义 ek_printf 宏）
+#define EKCFG_RTOS          (0)     // 是否使用 RTOS
+#define EKCFG_PICOLIBC      (1)     // 是否使用 picolibc（内部默认 1；模板默认 0。=1 时自动关闭 lwprintf）
+#define EKCFG_IO_LWPRTF     (0)     // IO 是否使用 lwprintf（内部默认 0；模板默认 1。两者均 0 时需在 ek_conf.h 自行定义 ek_printf 宏）
+#define EKCFG_STATIC_ALLOC  (0)     // 静态对象自动初始化（EK_DEFINE_*）
 
 // 核心服务（1=启用，0=禁用）
 #define EKCFG_EXPORT (0)
@@ -230,12 +234,15 @@ target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)
 #define EKCFG_HEAP_TLSF                (1)           // 使用 TLSF 分配器
 #define EKCFG_HEAP_SIZE                (30 * 1024)   // 堆大小（按 MCU SRAM 调整）
 #define EKCFG_HEAP_SECTION             ".tcmram"     // 堆所在链接器段
+#define EKCFG_TLSF_FL_INDEX_MAX        (24)          // TLSF 一级索引最大值，最大连续块为 2^N 字节
+#define EKCFG_TLSF_SL_INDEX_COUNT_LOG2 (3)           // TLSF 二级索引数量的 log2
 #define EKCFG_LOG_DEBUG                (1)           // 启用 DEBUG 日志
 #define EKCFG_LOG_COLOR                (1)           // ANSI 彩色日志
 #define EKCFG_LOG_BUF_SIZE             (256)         // 日志缓冲区
 #define EKCFG_ASSERT_TINY              (1)           // 轻量级断言
 #define EKCFG_ASSERT_LOG               (1)           // 断言时输出日志
 #define EKCFG_EVOKE_MIN_DEEPSLEEP_TICK (10)          // 进入深度睡眠最小 tick
+#define EKCFG_PT_PRIO_LOWEST           (31)          // 微线程最低优先级，就绪队列档位数为该值 + 1
 ```
 
 ### IO 后端选择（三种方式）
@@ -385,7 +392,7 @@ ek_stack_destroy_safely(sk);            // sk 释放后自动 = NULL
 
 ## 模块移植指南
 
-本章按移植顺序逐一说明 ek_utils 全部 17 个模块的集成方式：需要的源文件、依赖关系、配置宏、用户需实现的接口、链接脚本变更、初始化方式和注意事项。
+本章按移植顺序逐一说明 ek_utils 全部模块的集成方式：需要的源文件、依赖关系、配置宏、用户需实现的接口、链接脚本变更、初始化方式和注意事项。
 
 ### 移植总览
 
@@ -397,17 +404,18 @@ ek_stack_destroy_safely(sk);            // sk 释放后自动 = NULL
 |4|ek_io|核心服务|lwprintf / picolibc 后端实现 `ek_port_io_fputc()`；标准 libc 直通无需实现|
 |5|ek_log|核心服务|实现 `ek_port_log_get_tick()` — 系统时间戳|
 |6|ek_assert|核心服务|tiny 模式零移植；full 模式依赖 `ek_log`，可选覆盖 `ek_assert_hook`|
-|7|ek_heap|核心服务|决定堆段位置（`EKCFG_HEAP_SECTION`）|
+|7|ek_heap|核心服务|决定堆段位置（`EKCFG_HEAP_SECTION`），TLSF 索引由 `EKCFG_TLSF_*` 配置|
 |8|ek_list|数据结构|零移植，纯头文件|
 |9|ek_vec|数据结构|纯头文件，依赖 `ek_heap`|
-|10|ek_ringbuf|数据结构|依赖 `ek_heap`（动态分配）|
-|11|ek_stack|数据结构|依赖 `ek_heap`（动态分配）|
+|10|ek_ringbuf|数据结构|依赖 `ek_heap`（动态分配）；`EKCFG_STATIC_ALLOC=1` 时可用 `EK_DEFINE_RINGBUF*`|
+|11|ek_stack|数据结构|依赖 `ek_heap`（动态分配）；`EKCFG_STATIC_ALLOC=1` 时可用 `EK_DEFINE_STACK`|
 |12|ek_str|数据结构|依赖 `ek_heap` + `ek_io`（格式化）|
 |13|ek_export|系统服务|**必须修改链接脚本**（`.ek_export_fn` 段）|
-|14|ek_evoke|系统服务|仅裸机；实现 5 个弱函数（临界区/定时器/睡眠）|
-|15|ek_picothread|系统服务|无弱函数，纯调度器；主循环需配合定时器|
-|16|ek_picothread_sem|系统服务|依赖 `ek_picothread`，子模块无额外移植|
-|17|ek_picothread_msg|系统服务|依赖 `ek_picothread` + `ek_ringbuf`|
+|14|ek_static_alloc|系统服务|`EKCFG_STATIC_ALLOC=1` 时需增加 `.ek_static_alloc` 段|
+|15|ek_evoke|系统服务|仅裸机；实现 5 个弱函数（临界区/定时器/睡眠）；ISR FIFO 为文件内静态缓冲|
+|16|ek_picothread|系统服务|无弱函数，纯调度器；主循环需配合定时器；就绪队列为分级 FIFO|
+|17|ek_picothread_sem|系统服务|依赖 `ek_picothread`，子模块无额外移植|
+|18|ek_picothread_msg|系统服务|依赖 `ek_picothread` + `ek_ringbuf`|
 
 ---
 
@@ -494,8 +502,8 @@ const char *msg = ek_strerror(EK_ERR_TIMEOUT); // "Timeout"
 **注意事项**：
 - **用户必须创建 `ek_conf.h`**，否则 `ek_conf_internal.h` 中的 `#include "ek_conf.h"` 会编译失败
 - 复制 `ek_utils/ek_conf_template.h` 改名为 `ek_conf.h`，仅保留需要覆盖的宏即可
-- 依赖校验规则：`picolibc=1` 自动关闭 lwprintf；`evoke=1` 且 `RTOS=1` 编译报错；sem/msg 开启但 picothread 未开时报错
-- IO 后端规则：`EKCFG_PICOLIBC=1`（内部默认）走 picolibc；`EKCFG_IO_LWPRTF=1` 走 lwprintf；两者均为 0 时 `ek_printf` 等宏未定义，**必须在 `ek_conf.h` 中自行补全**（标准 libc 直通，见"IO 后端选择"）
+- 依赖校验规则：`picolibc=1` 自动关闭 lwprintf；`evoke=1` 且 `RTOS=1` 编译报错；sem/msg 开启但 picothread 未开时报错；`EKCFG_PT_PRIO_LOWEST` 必须 ≤ 31
+- IO 后端规则：`EKCFG_PICOLIBC=1`（内部默认）走 picolibc；`EKCFG_IO_LWPRTF=1` 走 lwprintf；两者均为 0 时 `ek_printf` 等宏未定义，**必须在 `ek_conf.h` 中自行补全**（标准 libc 直通，见"IO 后端选择")
 
 ---
 
@@ -642,7 +650,6 @@ EK_LOG("plain output");             // 无级别输出（级别为 NONE，受 EK
 
 **功能概述**：基于 TLSF（O(1) 分配/释放）的内存堆管理，支持多内存池，提供 `ek_malloc`/`ek_free`/`ek_realloc` 和 `_safely` 安全释放宏。
 
-**源文件**：
 - `ek_utils/inc/ek_heap.h`
 - `ek_utils/src/ek_heap.c`
 - `ek_utils/third_party/tlsf/tlsf.c`
@@ -658,6 +665,8 @@ EK_LOG("plain output");             // 无级别输出（级别为 NONE，受 EK
 | `EKCFG_HEAP_TLSF` | 1 | 使用 TLSF 分配器 |
 | `EKCFG_HEAP_SIZE` | 30×1024 | 默认堆大小（字节） |
 | `EKCFG_HEAP_SECTION` | 未定义 | 堆所在链接器段（如 `".tcmram"`），不定义则放 `.bss` |
+| `EKCFG_TLSF_FL_INDEX_MAX` | 24 | TLSF 一级索引最大值，最大连续块为 2 的该值次方字节 |
+| `EKCFG_TLSF_SL_INDEX_COUNT_LOG2` | 3 | TLSF 二级索引数量的 log2，二级链表数为 2 的该值次方 |
 
 **用户需实现的接口**（仅在 `EKCFG_HEAP_TLSF=0` 时）：
 - `void *ek_malloc(size_t size)`
@@ -669,7 +678,8 @@ EK_LOG("plain output");             // 无级别输出（级别为 NONE，受 EK
 **初始化**：`ek_heap_init()` 通过 `EK_EXPORT_EARLIEST(fn, 0)`（level=0）自动初始化，前提是已启用 `EKCFG_EXPORT=1` 并配置链接脚本段。否则需在 `main()` 起始手动调用。
 
 **注意事项**：
-- TLSF 内部管理开销约 768 字节（默认配置 `FL_INDEX_MAX=24, SL_INDEX_COUNT_LOG2=3`），可根据实际内存池大小调整（见 `ek_heap.c` 顶部注释）
+- TLSF 控制结构开销由 `EKCFG_TLSF_FL_INDEX_MAX` 和 `EKCFG_TLSF_SL_INDEX_COUNT_LOG2` 决定；默认 24/3 适合最大 16 MiB 的内存池
+- 较小内存池可降低 `EKCFG_TLSF_FL_INDEX_MAX` 以减少控制结构占用
 - `ek_free_safely(&ptr)` 释放后自动将 `ptr` 置 NULL
 - `ek_heap_add_pool()` 支持运行时添加额外内存池（如 SDRAM 区域）
 
@@ -772,7 +782,6 @@ ek_vec_destroy(v);              // 释放内存
 
 **功能概述**：任意类型的环形缓冲区（通用版 `ek_ringbuf_t` + SPSC 版 `ek_ringbuf_spsc_t`），RTOS 模式下通用版通过锁宏支持多线程安全。
 
-**源文件**：
 - `ek_utils/inc/ek_ringbuf.h`
 - `ek_utils/src/ek_ringbuf.c`
 
@@ -785,25 +794,31 @@ ek_vec_destroy(v);              // 释放内存
 |----|--------|------|
 | `EKCFG_RINGBUF` | 0 | 通用环形缓冲区 |
 | `EKCFG_RINGBUF_SPSC` | 0 | SPSC 无锁环形缓冲区 |
+| `EKCFG_STATIC_ALLOC` | 0 | 启用后可使用 `EK_DEFINE_RINGBUF` / `EK_DEFINE_RINGBUF_SPSC` |
 
 **用户需实现的接口**：无。
 
-**链接脚本变更**：无。
+**链接脚本变更**：使用静态定义宏时需配置 `.ek_static_alloc` 段。
 
 **初始化**：
 ```c
-// 通用版：item_amount = 实际可存元素数
+// 动态：amount = 实际可存元素数
 ek_ringbuf_t *rb = ek_ringbuf_create(sizeof(my_data_t), 10);
 
-// SPSC 版：item_amount = 底层槽位数，实际可存 item_amount - 1 个元素
+// SPSC 动态：amount = 底层槽位数，实际可存 amount - 1 个元素
 ek_ringbuf_spsc_t *rb_spsc = ek_ringbuf_create_spsc(sizeof(my_data_t), 11);
+
+// 静态：ek_export_init() 后对象已初始化，不走堆
+EK_DEFINE_RINGBUF(static_rb, my_data_t, 10);
+EK_DEFINE_RINGBUF_SPSC(static_spsc, my_data_t, 11);
 ```
 
 **注意事项**：
 - 通用版在 RTOS 模式下通过 `ek_conf_internal.h` 中的锁宏保护（用户在 `ek_conf.h` 中定义映射到 RTOS mutex/semaphore）
 - SPSC 版无锁，适合 ISR→主循环 或 单生产者单消费者场景（evoke 内部使用）
-- SPSC 版满判据：`(write_idx + 1) % cap == read_idx`
-- 使用 `ek_ringbuf_destroy_safely(&rb)` 安全释放
+- SPSC 版满判据：`(write_idx + 1) % cap == read_idx`，`amount` 是槽位数
+- 静态对象只走 `*_init_static()` / `*_deinit_static()`，deinit 不释放宏生成的 storage
+- 使用 `ek_ringbuf_destroy_safely(&rb)` 安全释放动态对象
 
 ---
 
@@ -823,10 +838,11 @@ ek_ringbuf_spsc_t *rb_spsc = ek_ringbuf_create_spsc(sizeof(my_data_t), 11);
 | 宏 | 默认值 | 说明 |
 |----|--------|------|
 | `EKCFG_STACK` | 0 | 模块开关 |
+| `EKCFG_STATIC_ALLOC` | 0 | 启用后可使用 `EK_DEFINE_STACK` |
 
 **用户需实现的接口**：无。
 
-**链接脚本变更**：无。
+**链接脚本变更**：使用静态定义宏时需配置 `.ek_static_alloc` 段。
 
 **初始化**：
 ```c
@@ -834,11 +850,15 @@ ek_stack_t *sk = ek_stack_create(sizeof(int), 20);
 ek_stack_push(sk, &val);
 ek_stack_pop(sk, &val);
 ek_stack_destroy_safely(&sk);
+
+// 静态：ek_export_init() 后对象已初始化，不走堆
+EK_DEFINE_STACK(static_sk, int, 20);
 ```
 
 **注意事项**：
 - RTOS 模式下通过锁宏保护（`EK_LOCK_TRY`/`EK_LOCK_RELEASE`，用户在 `ek_conf.h` 中定义映射）
 - 所有操作按 `item_size` 字节复制数据（值语义）
+- 静态对象只走 `ek_stack_init_static()` / `ek_stack_deinit_static()`，deinit 不释放宏生成的 storage
 
 ---
 
@@ -940,13 +960,77 @@ EK_EXPORT_USER(user_init, 0);        // level=4 — 用户初始化
 - 排序规则：先按 `level`（层级，0–4）升序，同层级内按 `order`（层内优先级）升序；通过 `qsort` 在运行时完成
 - `KEEP(*(.ek_export_fn*))` 保证即使 `--gc-sections` 也不会移除导出函数
 - `EKCFG_EXPORT=0` 时所有导出宏展开为空
-- ek_utils 内部模块（heap/evoke/picothread）自身也通过此机制自动初始化
+- ek_utils 内部模块（heap/evoke/picothread/static_alloc）自身也通过此机制自动初始化
+
+---
+
+### ek_static_alloc — 静态对象自动初始化
+
+**功能概述**：把 `EK_DEFINE_*` 展开出的静态对象登记到 `.ek_static_alloc` 段。`ek_static_alloc_init()` 复制注册项、按 `order` 升序排序后逐个调用初始化回调。某项失败时记录第一个错误并继续处理后续对象。
+
+**源文件**：
+- `ek_utils/inc/ek_static_alloc.h`
+- `ek_utils/src/ek_static_alloc.c`
+
+**依赖**：
+- ek_conf_internal、ek_def、ek_err
+- ek_export（`EKCFG_EXPORT=1` 时自动调用）
+- ek_log（可选，失败时输出错误）
+
+**配置宏**：
+| 宏 | 默认值 | 说明 |
+|----|--------|------|
+| `EKCFG_STATIC_ALLOC` | 0 | 模块开关；关闭后所有 `EK_DEFINE_*` 不可用 |
+
+**用户需实现的接口**：无。
+
+**链接脚本变更**：**必须添加 `.ek_static_alloc` 段**，否则静态对象不会被初始化：
+
+```ld
+.ek_static_alloc :
+{
+    . = ALIGN(4);
+    _ek_static_alloc_start = .;
+    KEEP(*(SORT(.ek_static_alloc*)))
+    . = ALIGN(4);
+    _ek_static_alloc_end = .;
+} > FLASH
+```
+
+**初始化**：
+- `EKCFG_EXPORT=1` 时，`ek_static_alloc_init()` 通过 `EK_EXPORT_COMPONENTS(..., 1)` 在 `ek_pt_init` / `ek_evoke_init` 之后自动执行
+- 未启用 `ek_export` 时，必须在堆初始化之后手动调用 `ek_static_alloc_init()`
+
+**使用示例**：
+```c
+EK_DEFINE_STACK(static_sk, int, 4);
+EK_DEFINE_RINGBUF(static_rb, int, 4);
+EK_DEFINE_RINGBUF_SPSC(static_spsc, int, 5);
+EK_DEFINE_PT(static_pt, led_task, 10, NULL);
+EK_DEFINE_PT_SEM(static_sem, 1);
+EK_DEFINE_PT_MSG(static_msg, int, 3);
+EK_DEFINE_EVOKE_TASK(static_task, led_cb, NULL);
+EK_DEFINE_EVOKE_EVENT(static_event, 0);
+
+int main(void) {
+    ek_export_init(); // 未启用 export 时改为手动 ek_heap_init(); ek_static_alloc_init();
+    if (ek_static_alloc_get_init_error() != EK_ERR_NONE) {
+        // 查看日志中的失败项
+    }
+}
+```
+
+**注意事项**：
+- `EK_DEFINE_*` 只能在文件作用域使用，因为它会展开为 `static` 对象、私有回调和链接器段描述符
+- 同一翻译单元内各宏的 `handle` 必须互不相同
+- 静态对象只走 `*_init_static()` / `*_deinit_static()`，deinit 不释放宏生成的存储
+- 容器类注册 order 为 10，调度对象注册 order 为 20
 
 ---
 
 ### ek_evoke — 事件驱动调度器
 
-**功能概述**：协作式事件驱动任务调度器。ISR 通过 SPSC ringbuf FIFO 向主循环推送事件请求（发布/广播/延迟），主循环从 FIFO 取出请求、执行就绪任务、管理延迟事件池和睡眠策略。仅裸机可用。
+**功能概述**：协作式事件驱动任务调度器。ISR 通过文件内静态 SPSC FIFO 向主循环推送事件请求（发布/广播/延迟），主循环从 FIFO 取出请求、执行就绪任务、管理延迟事件池和睡眠策略。仅裸机可用。
 
 **源文件**：
 - `ek_utils/inc/ek_evoke.h`
@@ -961,11 +1045,12 @@ EK_EXPORT_USER(user_init, 0);        // level=4 — 用户初始化
 |----|--------|------|
 | `EKCFG_EVOKE` | 0 | 模块开关（需 `EKCFG_RTOS=0`） |
 | `EKCFG_EVOKE_MIN_DEEPSLEEP_TICK` | 10 | 进入深度睡眠的最小空闲 tick |
+| `EKCFG_STATIC_ALLOC` | 0 | 启用后可使用 `EK_DEFINE_EVOKE_TASK` / `EK_DEFINE_EVOKE_EVENT` |
 
 **编译期常量（可覆盖）**：
 | 宏 | 默认值 | 说明 |
 |----|--------|------|
-| `EK_EVOKE_MAX_ISR_REQ` | 10 | ISR 请求队列容量 |
+| `EK_EVOKE_MAX_ISR_REQ` | 10 | ISR 请求队列容量（文件内静态缓冲槽位数） |
 | `EK_EVOKE_MAX_DEFER_REQ` | 10 | 延迟请求池容量 |
 
 **用户需实现的接口（5 个弱函数）**：
@@ -978,16 +1063,15 @@ EK_EXPORT_USER(user_init, 0);        // level=4 — 用户初始化
 | `ek_evoke_light_sleep()` | 浅睡眠 | `__WFI()` |
 | `ek_evoke_deep_sleep()` | 深度睡眠 | 进入低功耗模式（STOP/STANDBY），需配置唤醒源 |
 
-**链接脚本变更**：无（但如果使用 `EK_EXPORT_LEVEL` 自动初始化则需配置 `.ek_export` 段）。
+**链接脚本变更**：使用 `EK_EXPORT_LEVEL` 自动初始化则需配置 `.ek_export` 段；使用静态任务/事件宏则需配置 `.ek_static_alloc` 段。
 
-**初始化**：`ek_evoke_init()` 通过 `EK_EXPORT_COMPONENTS` 自动初始化，或手动调用。初始化后通过 `ek_evoke_event_loop()` 进入主循环（永不返回）。
+**初始化**：`ek_evoke_init()` 通过 `EK_EXPORT_COMPONENTS` 自动初始化，或手动调用。ISR FIFO 在 `ek_evoke_init()` 中填入文件内静态缓冲，不再动态分配。初始化后通过 `ek_evoke_event_loop()` 进入主循环（永不返回）。
 
 **典型主循环模式**：
 ```c
 int main(void) {
     ek_export_init();         // 自动初始化 heap → evoke
 
-    // 创建任务和事件
     ek_evoke_task_handle_t tsk = ek_evoke_task_create(led_cb, NULL);
     ek_evoke_event_handle_t evt = ek_evoke_event_create(0);
     ek_evoke_event_subscribe(tsk, evt);
@@ -995,10 +1079,9 @@ int main(void) {
     ek_evoke_event_loop();   // 永不返回
 }
 
-// ISR 中发布事件
-void TIMER_IRQHandler(void) {
-    ek_evoke_event_publish_from_isr(evt, NULL);
-}
+// 或静态定义，ek_export_init() 后直接使用
+EK_DEFINE_EVOKE_TASK(static_task, led_cb, NULL);
+EK_DEFINE_EVOKE_EVENT(static_event, 0);
 ```
 
 **注意事项**：
@@ -1006,12 +1089,13 @@ void TIMER_IRQHandler(void) {
 - ISR 中的 `*_from_isr` 函数内部使用 `ek_evoke_enter/exit_critical` 保护 FIFO 写入
 - 延迟事件通过 `ek_evoke_set_timer()` 设置硬件定时器唤醒
 - 睡眠锁（`ek_evoke_sleep_lock/unlock`）用于在关键操作期间禁止深度睡眠
+- 任务和事件对象不再保存名字字符串；静态宏第一个参数是 `handle`，不是调试名
 
 ---
 
 ### ek_picothread — 微线程调度器
 
-**功能概述**：基于 protothread 的协作式微线程调度器。通过 `EK_PT_BEGIN/YEILD/END` 宏在单函数内实现协程式逻辑，支持优先级调度和定时阻塞。
+**功能概述**：基于 protothread 的协作式微线程调度器。通过 `EK_PT_BEGIN/YEILD/END` 宏在单函数内实现协程式逻辑，支持分级 FIFO 优先级调度和定时阻塞。
 
 **源文件**：
 - `ek_utils/inc/ek_picothread.h`
@@ -1027,16 +1111,18 @@ void TIMER_IRQHandler(void) {
 | `EKCFG_PICOTHREAD` | 0 | 微线程调度器总开关 |
 | `EKCFG_PICOTHREAD_SEM` | 0 | 信号量子模块（依赖 PICOTHREAD） |
 | `EKCFG_PICOTHREAD_MSG` | 0 | 消息队列子模块（依赖 PICOTHREAD + RINGBUF） |
+| `EKCFG_PT_PRIO_LOWEST` | 31 | 最低优先级，就绪队列档位数为该值 + 1，必须 ≤ 31 |
+| `EKCFG_STATIC_ALLOC` | 0 | 启用后可使用 `EK_DEFINE_PT` / `EK_DEFINE_PT_SEM` / `EK_DEFINE_PT_MSG` |
 
 **用户需实现的接口**：无 — 无弱函数，纯调度器。
 
-**链接脚本变更**：使用 `EK_EXPORT_LEVEL` 自动初始化则需配置 `.ek_export` 段。
+**链接脚本变更**：使用 `EK_EXPORT_LEVEL` 自动初始化则需配置 `.ek_export` 段；使用静态宏则需配置 `.ek_static_alloc` 段。
 
-**初始化**：`ek_pt_init()` 通过 `EK_EXPORT_COMPONENTS`（level=2）自动初始化，或手动调用。
+**初始化**：`ek_pt_init()` 通过 `EK_EXPORT_COMPONENTS`（level=2, order=0）自动初始化，或手动调用。静态任务在 `ek_static_alloc_init()` 中入队，因此必须先完成 `ek_pt_init()`。
 
 **主循环模式**：
 
-`ek_pt_schedule(now)` 返回 `uint32_t`，有三种情况：
+每次 `ek_pt_schedule(now)` 只运行一个就绪任务。返回 `uint32_t`，有三种情况：
 
 | 返回值 | 含义 | 主循环行为 |
 |--------|------|-----------|
@@ -1057,6 +1143,7 @@ static void led_task(ek_pt_handle_t pt, void *arg) {
 int main(void) {
     ek_export_init();
     ek_pt_create(led_task, 0, NULL);
+    // 或：EK_DEFINE_PT(led_pt, led_task, 0, NULL);
 
     while (1) {
         uint32_t now = get_tick();
@@ -1075,8 +1162,11 @@ int main(void) {
 **注意事项**：
 - `EK_PT_BEGIN`/`EK_PT_END` 必须在回调函数体内配对使用，利用 `switch-case` 实现协程恢复
 - `EK_PT_YEILD` 保存行号后 `return`，下次调度从此处恢复 — 确保局部变量不跨 `YEILD` 保存状态（用 `static` 变量或结构体成员）
-- 优先级数值越小越高，在就绪链表头插入
-- 阻塞链表按唤醒 tick（绝对时间）排序，tick 相同时按优先级排序
+- 优先级数值越小越高，合法范围是 `0 .. EKCFG_PT_PRIO_LOWEST`
+- 就绪队列是每级一条 FIFO：入队到 `s_ready_list[prio]` 尾部，用 32-bit 位图取最高优先级队头，同级不会互相饿死
+- 阻塞链表按唤醒 tick（绝对时间）排序，tick 相同时按静态优先级排序
+- 信号量/消息等待队列仍按静态优先级插入，不走就绪位图
+- 任务对象不再保存名字字符串；`ek_pt_create(cb, prio, arg)` / `EK_DEFINE_PT(handle, cb, prio, arg)`
 - `ek_pt_destroy` 不能在任务正在运行（`s_cur_pt`）时销毁自身
 
 ---
@@ -1094,6 +1184,7 @@ int main(void) {
 | 宏 | 默认值 | 说明 |
 |----|--------|------|
 | `EKCFG_PICOTHREAD_SEM` | 0 | 信号量子模块开关 |
+| `EKCFG_STATIC_ALLOC` | 0 | 启用后可使用 `EK_DEFINE_PT_SEM` |
 
 **用户需实现的接口**：无。
 
@@ -1102,6 +1193,7 @@ int main(void) {
 **初始化**：
 ```c
 ek_pt_sem_handle_t sem = ek_pt_sem_create(1); // 初始计数 = 1（二值信号量）
+// 或：EK_DEFINE_PT_SEM(static_sem, 1);
 ```
 
 **使用示例**：
@@ -1124,12 +1216,13 @@ static void producer(ek_pt_handle_t pt, void *arg) {
 - `EK_PT_SEM_TAKE` 在信号量不可用时阻塞当前任务，超时后 `err == EK_ERR_TIMEOUT`
 - `EK_PT_SEM_GIVE` 优先唤醒等待队列中优先级最高的任务
 - `ek_pt_sem_destroy` 会唤醒所有等待任务，`wait_result` 设为 `EK_ERR_ABORTED`
+- 静态信号量使用 `EK_DEFINE_PT_SEM(handle, count)`，不走堆
 
 ---
 
 ### ek_picothread_msg — 微线程消息队列
 
-**功能概述**：微线程间的消息传递机制，内部复用 `ek_ringbuf_t` 存储消息数据，支持发送/接收超时等待。
+**功能概述**：微线程间的消息传递机制，内部复用内嵌的 `ek_ringbuf_t` 存储消息数据，支持发送/接收超时等待。
 
 **源文件**：无需额外文件 — 实现在 `ek_picothread.h`/`.c` 中，由 `EKCFG_PICOTHREAD_MSG` 守卫控制编译。
 
@@ -1141,6 +1234,7 @@ static void producer(ek_pt_handle_t pt, void *arg) {
 | 宏 | 默认值 | 说明 |
 |----|--------|------|
 | `EKCFG_PICOTHREAD_MSG` | 0 | 消息队列子模块开关 |
+| `EKCFG_STATIC_ALLOC` | 0 | 启用后可使用 `EK_DEFINE_PT_MSG` |
 
 **用户需实现的接口**：无。
 
@@ -1149,6 +1243,7 @@ static void producer(ek_pt_handle_t pt, void *arg) {
 **初始化**：
 ```c
 ek_pt_msg_handle_t msg = ek_pt_msg_create(sizeof(my_data_t), 8); // 8 条消息容量
+// 或：EK_DEFINE_PT_MSG(static_msg, my_data_t, 8);
 ```
 
 **使用示例**：
@@ -1179,3 +1274,4 @@ static void receiver(ek_pt_handle_t pt, void *arg) {
 - 消息队列满时发送任务阻塞在 send_wait 队列；空时接收任务阻塞在 recv_wait 队列
 - `ek_pt_msg_destroy` 会唤醒所有等待任务，`wait_result` 设为 `EK_ERR_ABORTED`
 - 数据按 `item_size` 字节复制（值语义），与 `ek_ringbuf` 行为一致
+- 静态消息队列使用 `EK_DEFINE_PT_MSG(handle, type, amount)`，ringbuf 内嵌在 `ek_pt_msg_t` 中，不额外声明独立 ringbuf 对象

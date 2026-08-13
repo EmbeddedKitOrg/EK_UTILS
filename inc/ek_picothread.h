@@ -180,7 +180,7 @@ void ek_pt_init(void);
  * @brief 创建微线程
  *
  * @param cb   回调函数
- * @param prio 优先级（数值越小优先级越高）
+ * @param prio 优先级（数值越小优先级越高，范围为 0..EKCFG_PT_PRIO_LOWEST）
  * @param arg  用户参数
  * @return 微线程句柄，失败返回 NULL（通过断言捕获）
  */

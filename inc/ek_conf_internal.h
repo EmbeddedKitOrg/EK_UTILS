@@ -186,6 +186,9 @@
 #ifndef EKCFG_EVOKE_MIN_DEEPSLEEP_TICK
 #    define EKCFG_EVOKE_MIN_DEEPSLEEP_TICK (10) /**< 进入深度睡眠最小tick */
 #endif
+#ifndef EKCFG_PT_PRIO_LOWEST
+#    define EKCFG_PT_PRIO_LOWEST (31) /**< 微线程最低优先级，就绪队列档位数为该值 + 1 */
+#endif
 /* ========================================================================
  * 配置依赖校验（始终执行，不区分配置来源）
  * ======================================================================== */
@@ -203,6 +206,9 @@
 #endif
 #if EKCFG_PICOTHREAD_MSG == 1 && EKCFG_PICOTHREAD == 0
 #    error "EKCFG_PICOTHREAD_MSG requires EKCFG_PICOTHREAD == 1"
+#endif
+#if EKCFG_PT_PRIO_LOWEST > 31
+#    error "EKCFG_PT_PRIO_LOWEST must be <= 31 (ready mask is 32-bit)"
 #endif
 
 #endif /* EK_CONF_INTERNAL_H */

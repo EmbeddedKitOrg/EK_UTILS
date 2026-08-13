@@ -1,3 +1,9 @@
+/**
+ * @file ek_static_alloc.c
+ * @brief 静态对象自动注册与初始化实现
+ * @author N1netyNine99
+ */
+
 #include "ek_static_alloc.h"
 
 #if EKCFG_STATIC_ALLOC == 1
