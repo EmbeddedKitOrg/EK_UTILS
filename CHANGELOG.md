@@ -18,6 +18,7 @@
 - 第三方源码按配置空编译：`third_party/tlsf` 由 `EKCFG_HEAP_TLSF==1` 守卫，`third_party/lwprintf` 由 `EKCFG_IO_LWPRTF==1` 守卫。
 - 微线程最低优先级可配：`EKCFG_PT_PRIO_LOWEST`（默认 31，就绪队列档位数为该值 + 1）。
 - `ek_io.h` 在非 lwprintf/picolibc 路径下补 `#include <stdio.h>`，方便用户把 `ek_printf` 映射到标准 libc。
+- `ek_def.h` 增加软件版本宏：`EK_VERSION_MAJOR` / `EK_VERSION_MINOR` / `EK_VERSION_PATCH`（当前 2.0.0）。
 
 ### 变更
 

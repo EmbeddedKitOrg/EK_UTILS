@@ -15,6 +15,11 @@
 #ifndef EK_DEF_H
 #define EK_DEF_H
 
+/* ========== 软件版本号 ========== */
+#define EK_VERSION_MAJOR 2
+#define EK_VERSION_MINOR 0
+#define EK_VERSION_PATCH 0
+
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
