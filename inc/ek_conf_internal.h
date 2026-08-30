@@ -139,6 +139,9 @@
 #ifndef EKCFG_STACK
 #    define EKCFG_STACK (0) /**< 通用栈 */
 #endif
+#ifndef EKCFG_SNAPSHOT
+#    define EKCFG_SNAPSHOT (0) /**< 快照 */
+#endif
 #ifndef EKCFG_EVOKE
 #    define EKCFG_EVOKE (0) /**< 事件驱动调度器 */
 #endif
