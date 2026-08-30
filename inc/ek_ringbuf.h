@@ -24,7 +24,7 @@ typedef struct ek_ringbuf_spsc ek_ringbuf_spsc_t;
 #    if EKCFG_RINGBUF == 1
 struct ek_ringbuf
 {
-    uint8_t *buffer; /**< 缓冲区指针 */
+    uint8_t *buffer; /**< 数据区起始指针：动态创建时指向尾部 data[]，静态初始化时指向外部存储 */
     uint32_t write_idx; /**< 写入位置索引 */
     uint32_t read_idx; /**< 读取位置索引 */
     uint32_t item_amount; /**< 当前元素个数 */
@@ -33,17 +33,19 @@ struct ek_ringbuf
 #        if EKCFG_RTOS == 1
     EK_LOCK_TYPE lock;
 #        endif /* EKCFG_RTOS */
+    uint8_t data[]; /**< 柔性数组：动态创建时缓冲区内嵌于此（单次分配），静态路径不使用 */
 };
 #    endif /* EKCFG_RINGBUF */
 
 #    if EKCFG_RINGBUF_SPSC == 1
 struct ek_ringbuf_spsc
 {
-    uint8_t *buffer; /**< 缓冲区指针 */
+    uint8_t *buffer; /**< 数据区起始指针：动态创建时指向尾部 data[]，静态初始化时指向外部存储 */
     uint32_t write_idx; /**< 写入位置索引 */
     uint32_t read_idx; /**< 读取位置索引 */
     size_t cap; /**< 底层槽位数量，实际最大可存元素数为 cap - 1 */
     size_t item_size; /**< 单个元素大小（字节） */
+    uint8_t data[]; /**< 柔性数组：动态创建时缓冲区内嵌于此（单次分配），静态路径不使用 */
 };
 #    endif /* EKCFG_RINGBUF_SPSC */
 
@@ -81,7 +83,7 @@ ek_ringbuf_t *ek_ringbuf_create(size_t item_size, uint32_t item_amount);
  * @brief 销毁环形缓冲区
  * @param rb 要销毁的环形缓冲区
  *
- * @note ek_free_safely 会自动将 rb->buffer 置为 NULL，但 rb 本身需要调用者手动置空
+ * @note 缓冲区与控制块同块分配，本函数仅 ek_free(rb) 一次；配合 ek_ringbuf_destroy_safely() 使用
  */
 void ek_ringbuf_destroy(ek_ringbuf_t *rb);
 

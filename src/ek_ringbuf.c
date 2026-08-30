@@ -61,18 +61,19 @@ ek_ringbuf_t *ek_ringbuf_create(size_t item_size, uint32_t item_amount)
 {
     ek_assert_param(item_amount != 0);
     ek_assert_param(item_size != 0);
+    // 防止总大小溢出
+    if (item_amount > (SIZE_MAX - sizeof(ek_ringbuf_t)) / item_size)
+    {
+        return NULL;
+    }
 
-    ek_ringbuf_t *rb = (ek_ringbuf_t *)ek_malloc(sizeof(ek_ringbuf_t));
+    ek_ringbuf_t *rb = (ek_ringbuf_t *)ek_malloc(sizeof(ek_ringbuf_t) + (size_t)item_amount * item_size);
     if (rb == NULL)
     {
         return NULL;
     }
-    rb->buffer = (uint8_t *)ek_malloc(item_amount * item_size);
-    if (rb->buffer == NULL)
-    {
-        ek_free(rb);
-        return NULL;
-    }
+
+    rb->buffer = rb->data;
 
     rb->cap = item_amount;
     rb->item_size = item_size;
@@ -92,7 +93,6 @@ void ek_ringbuf_destroy(ek_ringbuf_t *rb)
     EK_LOCK_DEINIT(rb->lock);
 #        endif
 
-    ek_free(rb->buffer);
     ek_free(rb);
 }
 
@@ -213,19 +213,19 @@ ek_ringbuf_spsc_t *ek_ringbuf_create_spsc(size_t item_size, uint32_t item_amount
 {
     ek_assert_param(item_amount > 1U);
     ek_assert_param(item_size != 0U);
+    // 防止总大小溢出
+    if (item_amount > (SIZE_MAX - sizeof(ek_ringbuf_spsc_t)) / item_size)
+    {
+        return NULL;
+    }
 
-    ek_ringbuf_spsc_t *rb = (ek_ringbuf_spsc_t *)ek_malloc(sizeof(ek_ringbuf_spsc_t));
+    ek_ringbuf_spsc_t *rb = (ek_ringbuf_spsc_t *)ek_malloc(sizeof(ek_ringbuf_spsc_t) + (size_t)item_amount * item_size);
     if (rb == NULL)
     {
         return NULL;
     }
 
-    rb->buffer = (uint8_t *)ek_malloc(item_amount * item_size);
-    if (rb->buffer == NULL)
-    {
-        ek_free(rb);
-        return NULL;
-    }
+    rb->buffer = rb->data;
 
     rb->cap = item_amount;
     rb->item_size = item_size;
@@ -238,7 +238,6 @@ void ek_ringbuf_destroy_spsc(ek_ringbuf_spsc_t *rb)
 {
     ek_assert_param(rb != NULL);
 
-    ek_free(rb->buffer);
     ek_free(rb);
 }
 

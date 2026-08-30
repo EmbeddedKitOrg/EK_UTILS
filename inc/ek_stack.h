@@ -32,13 +32,14 @@ typedef struct ek_stack ek_stack_t;
 
 struct ek_stack
 {
-    void *buffer; /**< 数据缓冲区指针 */
+    void *buffer; /**< 数据区起始指针：动态创建时指向尾部 data[]，静态初始化时指向外部存储 */
     uint32_t sp; /**< 栈顶指针（stack pointer），指向下一个写入位置 */
     size_t item_size; /**< 单个元素的大小（字节） */
     uint32_t cap; /**< 栈的最大容量 */
 #    if EKCFG_RTOS == 1
     EK_LOCK_TYPE lock;
 #    endif /* EKCFG_RTOS */
+    uint8_t data[]; /**< 柔性数组：动态创建时缓冲区内嵌于此（单次分配），静态路径不使用 */
 };
 
 #    ifdef __cplusplus
@@ -90,7 +91,7 @@ ek_stack_t *ek_stack_create(size_t item_size, uint32_t item_amount);
  *
  * @param sk 栈指针
  *
- * @note ek_free_safely 会自动将 sk->buffer 置为 NULL，但 sk 本身需要调用者手动置空
+ * @note 缓冲区与控制块同块分配，本函数仅 ek_free(sk) 一次；配合 ek_stack_destroy_safely() 使用
  * @warning 传入 NULL 指针将触发断言失败
  * @warning 不应对同一个栈多次调用此函数
  */

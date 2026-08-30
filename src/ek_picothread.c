@@ -422,17 +422,14 @@ void ek_pt_msg_deinit_static(ek_pt_msg_t *msg)
 #        endif /* EKCFG_STATIC_ALLOC */
 ek_pt_msg_handle_t ek_pt_msg_create(size_t item_size, uint32_t item_amount)
 {
-    ek_pt_msg_t *msg = ek_malloc(sizeof(*msg));
+    if (item_size == 0U || item_amount == 0U) return NULL;
+    // 防止总大小溢出
+    if (item_amount > (SIZE_MAX - sizeof(ek_pt_msg_t)) / item_size) return NULL;
+
+    ek_pt_msg_t *msg = (ek_pt_msg_t *)ek_malloc(sizeof(ek_pt_msg_t) + (size_t)item_amount * item_size);
     ek_assert_param(msg != NULL);
 
-    uint8_t *buffer = ek_malloc(item_amount * item_size);
-    if (buffer == NULL)
-    {
-        ek_free(msg);
-        return NULL;
-    }
-
-    msg->rb.buffer = buffer;
+    msg->rb.buffer = msg->data;
     msg->rb.cap = item_amount;
     msg->rb.item_size = item_size;
     msg->rb.read_idx = 0U;
@@ -473,7 +470,6 @@ void ek_pt_msg_destroy(ek_pt_msg_handle_t msg)
         pt->state = EK_PT_STATE_READY;
     }
 
-    ek_free(msg->rb.buffer);
     ek_free(msg);
 }
 

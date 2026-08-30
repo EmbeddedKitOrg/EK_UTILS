@@ -55,18 +55,19 @@ ek_stack_t *ek_stack_create(size_t item_size, uint32_t item_amount)
 {
     ek_assert_param(item_amount != 0);
     ek_assert_param(item_size != 0);
+    // 防止总大小溢出
+    if (item_amount > (SIZE_MAX - sizeof(ek_stack_t)) / item_size)
+    {
+        return NULL;
+    }
 
-    ek_stack_t *sk = (ek_stack_t *)ek_malloc(sizeof(ek_stack_t));
+    ek_stack_t *sk = (ek_stack_t *)ek_malloc(sizeof(ek_stack_t) + (size_t)item_amount * item_size);
     if (sk == NULL)
     {
         return NULL;
     }
-    sk->buffer = (uint8_t *)ek_malloc(item_amount * item_size);
-    if (sk->buffer == NULL)
-    {
-        ek_free(sk);
-        return NULL;
-    }
+
+    sk->buffer = sk->data;
 
     sk->sp = 0U;
     sk->cap = item_amount;
@@ -84,7 +85,6 @@ void ek_stack_destroy(ek_stack_t *sk)
 #    if EKCFG_RTOS == 1
     EK_LOCK_DEINIT(sk->lock);
 #    endif
-    ek_free(sk->buffer);
     ek_free(sk);
 }
 

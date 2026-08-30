@@ -52,6 +52,7 @@ struct ek_pt_msg
     ek_ringbuf_t rb;
     ek_list_node_t recv_wait;
     ek_list_node_t send_wait;
+    uint8_t data[]; /**< 柔性数组：动态创建时消息缓冲区内嵌于此（单次分配），静态路径不使用 */
 };
 #    endif /* EKCFG_PICOTHREAD_MSG */
 
