@@ -29,6 +29,7 @@ ek_utils/
 │   ├── ek_vec.h                   # 类型安全动态数组（纯头文件，宏生成类型）
 │   ├── ek_ringbuf.h               # 环形缓冲区（通用 + SPSC 无锁变体）
 │   ├── ek_stack.h                 # 通用 LIFO 栈
+│   ├── ek_snapshot.h              # 快照数据（单槽覆盖写，整块读写）
 │   ├── ek_str.h                   # 动态字符串
 │   ├── ek_export.h                # 函数自动导出初始化（类似 Linux initcall）
 │   ├── ek_static_alloc.h          # 静态对象自动注册与初始化
@@ -44,6 +45,7 @@ ek_utils/
 │   ├── ek_picothread.c
 │   ├── ek_picolibc_port.c          # picolibc 适配层
 │   ├── ek_ringbuf.c
+│   ├── ek_snapshot.c
 │   ├── ek_stack.c
 │   ├── ek_static_alloc.c
 │   └── ek_str.c
@@ -69,6 +71,7 @@ ek_utils/
 | `ek_ringbuf` | `EKCFG_RINGBUF` | 数据结构 | 通用环形缓冲区（RTOS 模式下通过锁宏支持多线程安全） |
 | `ek_ringbuf_spsc` | `EKCFG_RINGBUF_SPSC` | 数据结构 | SPSC 单生产者单消费者无锁环形缓冲区 |
 | `ek_stack` | `EKCFG_STACK` | 数据结构 | 通用 LIFO 栈 |
+| `ek_snapshot` | `EKCFG_SNAPSHOT` | 数据结构 | 单槽快照（唯一 id 覆盖写，整块读写） |
 | `ek_str` | `EKCFG_STR` | 数据结构 | 自动扩容的动态字符串 |
 | `ek_export` | `EKCFG_EXPORT` | 系统服务 | 基于链接器段的自动初始化（需配合链接脚本） |
 | `ek_static_alloc` | `EKCFG_STATIC_ALLOC` | 系统服务 | 静态对象自动注册（`EK_DEFINE_*` → `.ek_static_alloc` 段） |
@@ -223,6 +226,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE Core/Inc)
 #define EKCFG_RINGBUF        (0)
 #define EKCFG_RINGBUF_SPSC   (0)
 #define EKCFG_STACK          (0)
+#define EKCFG_SNAPSHOT       (0)
 
 // 系统服务（1=启用，0=禁用）
 #define EKCFG_EVOKE          (0)   // 仅裸机 (EKCFG_RTOS=0 时可用)
@@ -409,13 +413,14 @@ ek_stack_destroy_safely(sk);            // sk 释放后自动 = NULL
 |9|ek_vec|数据结构|纯头文件，依赖 `ek_heap`|
 |10|ek_ringbuf|数据结构|依赖 `ek_heap`（动态分配）；`EKCFG_STATIC_ALLOC=1` 时可用 `EK_DEFINE_RINGBUF*`|
 |11|ek_stack|数据结构|依赖 `ek_heap`（动态分配）；`EKCFG_STATIC_ALLOC=1` 时可用 `EK_DEFINE_STACK`|
-|12|ek_str|数据结构|依赖 `ek_heap` + `ek_io`（格式化）|
-|13|ek_export|系统服务|**必须修改链接脚本**（`.ek_export_fn` 段）|
-|14|ek_static_alloc|系统服务|`EKCFG_STATIC_ALLOC=1` 时需增加 `.ek_static_alloc` 段|
-|15|ek_evoke|系统服务|仅裸机；实现 5 个弱函数（临界区/定时器/睡眠）；ISR FIFO 为文件内静态缓冲|
-|16|ek_picothread|系统服务|无弱函数，纯调度器；主循环需配合定时器；就绪队列为分级 FIFO|
-|17|ek_picothread_sem|系统服务|依赖 `ek_picothread`，子模块无额外移植|
-|18|ek_picothread_msg|系统服务|依赖 `ek_picothread` + `ek_ringbuf`|
+|12|ek_snapshot|数据结构|依赖 `ek_heap`（动态分配）；`EKCFG_STATIC_ALLOC=1` 时可用 `EK_SNAPSHOT_DEFINE`|
+|13|ek_str|数据结构|依赖 `ek_heap` + `ek_io`（格式化）|
+|14|ek_export|系统服务|**必须修改链接脚本**（`.ek_export_fn` 段）|
+|15|ek_static_alloc|系统服务|`EKCFG_STATIC_ALLOC=1` 时需增加 `.ek_static_alloc` 段|
+|16|ek_evoke|系统服务|仅裸机；实现 5 个弱函数（临界区/定时器/睡眠）；ISR FIFO 为文件内静态缓冲|
+|17|ek_picothread|系统服务|无弱函数，纯调度器；主循环需配合定时器；就绪队列为分级 FIFO|
+|18|ek_picothread_sem|系统服务|依赖 `ek_picothread`，子模块无额外移植|
+|19|ek_picothread_msg|系统服务|依赖 `ek_picothread` + `ek_ringbuf`|
 
 ---
 
@@ -808,16 +813,17 @@ ek_ringbuf_t *rb = ek_ringbuf_create(sizeof(my_data_t), 10);
 // SPSC 动态：amount = 底层槽位数，实际可存 amount - 1 个元素
 ek_ringbuf_spsc_t *rb_spsc = ek_ringbuf_create_spsc(sizeof(my_data_t), 11);
 
-// 静态：ek_export_init() 后对象已初始化，不走堆
+// 静态：ek_export_init() 后对象已初始化，不走堆；句柄即指针，直接传入 API（无需 &）
 EK_DEFINE_RINGBUF(static_rb, my_data_t, 10);
 EK_DEFINE_RINGBUF_SPSC(static_spsc, my_data_t, 11);
+ek_ringbuf_write(static_rb, &d); // 例：静态句柄用法与动态指针一致
 ```
 
 **注意事项**：
 - 通用版在 RTOS 模式下通过 `ek_conf_internal.h` 中的锁宏保护（用户在 `ek_conf.h` 中定义映射到 RTOS mutex/semaphore）
 - SPSC 版无锁，适合 ISR→主循环 或 单生产者单消费者场景（evoke 内部使用）
 - SPSC 版满判据：`(write_idx + 1) % cap == read_idx`，`amount` 是槽位数
-- 静态对象只走 `*_init_static()` / `*_deinit_static()`，deinit 不释放宏生成的 storage
+- 静态宏展开为 union（控制块与数据连续），句柄是指针，直接传入 API（无需 `&`）；静态对象只走 `*_init_static()` / `*_deinit_static()`，deinit 不释放内存
 - 使用 `ek_ringbuf_destroy_safely(&rb)` 安全释放动态对象
 
 ---
@@ -858,9 +864,67 @@ EK_DEFINE_STACK(static_sk, int, 20);
 **注意事项**：
 - RTOS 模式下通过锁宏保护（`EK_LOCK_TRY`/`EK_LOCK_RELEASE`，用户在 `ek_conf.h` 中定义映射）
 - 所有操作按 `item_size` 字节复制数据（值语义）
-- 静态对象只走 `ek_stack_init_static()` / `ek_stack_deinit_static()`，deinit 不释放宏生成的 storage
+- 静态宏展开为 union（控制块与数据连续），句柄是指针，直接传入 API（无需 `&`）；静态对象只走 `ek_stack_init_static()` / `ek_stack_deinit_static()`，deinit 不释放内存
 
 ---
+
+### ek_snapshot — 快照数据
+
+**功能概述**：单槽快照数据结构：生产者以唯一 id（`unique`，可用时间戳/递增序号）覆盖写入最新一份数据，消费者随时整块读取。控制块与数据单次分配（柔性数组内联），无扩容。
+
+**源文件**：
+- `ek_utils/inc/ek_snapshot.h`
+- `ek_utils/src/ek_snapshot.c`
+
+**依赖**：
+- ek_err、ek_conf_internal、ek_def
+- ek_heap（动态分配）
+
+**配置宏**：
+| 宏 | 默认值 | 说明 |
+|----|--------|------|
+| `EKCFG_SNAPSHOT` | 0 | 模块开关 |
+| `EKCFG_STATIC_ALLOC` | 0 | 启用后可使用 `EK_SNAPSHOT_DEFINE` |
+
+**用户需实现的接口**：无。
+
+**链接脚本变更**：使用静态定义宏时需配置 `.ek_static_alloc` 段。
+
+**初始化**：
+```c
+// 动态：控制块与数据单次分配
+ek_snapshot_t *snap = ek_snapshot_create(sizeof(my_data_t));
+
+// 静态：ek_export_init() 后对象已初始化，不走堆；句柄即指针
+EK_SNAPSHOT_DEFINE(static_snap, sizeof(my_data_t));
+```
+
+**使用示例**：
+```c
+my_data_t tx = { /* 最新采样 */ };
+my_data_t rx;
+
+// 写入快照：unique 为递增序号/时间戳，不得为 0 或与当前 id 相同
+if (ek_snapshot_set(snap, &tx, ++seq) == EK_ERR_NONE) {
+    // 快照已更新
+}
+
+// 读取快照：无数据时返回 EK_ERR_NODATA
+if (ek_snapshot_get(snap, &rx) == EK_ERR_NONE) {
+    // rx 即最新快照
+}
+
+// 查询当前快照 id（0 表示无数据）
+uint32_t id = ek_snapshot_get_unique(snap);
+```
+
+**注意事项**：
+- `unique` 为 0 表示无数据：新建快照 `get` 返回 `EK_ERR_NODATA`，写入 `unique=0` 会被拒绝
+- `ek_snapshot_set` 传入与当前相同的 `unique` 返回 `EK_ERR_INVAL`，防止旧数据倒灌覆盖新快照
+- 读写按 `data_size` 整块 `memcpy`，数据类型由用户保证，无类型检查、无扩容
+- 适用于"生产者高频更新、消费者随机读取最新值"的场景（如传感器最新采样、状态快照）
+- 静态宏展开为 union（控制块与数据连续），句柄是指针，直接传入 API（无需 `&`）；静态对象只走 `ek_snapshot_init_static()` / `ek_snapshot_deinit_static()`，deinit 不释放内存
+
 
 ### ek_str — 动态字符串
 
@@ -1023,7 +1087,7 @@ int main(void) {
 **注意事项**：
 - `EK_DEFINE_*` 只能在文件作用域使用，因为它会展开为 `static` 对象、私有回调和链接器段描述符
 - 同一翻译单元内各宏的 `handle` 必须互不相同
-- 静态对象只走 `*_init_static()` / `*_deinit_static()`，deinit 不释放宏生成的存储
+- 静态宏展开为 union（控制块与数据连续），句柄是指针，直接传入 API（无需 `&`）；静态对象只走 `*_init_static()` / `*_deinit_static()`，deinit 不释放内存
 - 容器类注册 order 为 10，调度对象注册 order 为 20
 
 ---

@@ -45,14 +45,13 @@ typedef ek_pt_msg_t *ek_pt_msg_handle_t;
 /**
  * @brief 消息队列结构体
  *
- * 内部复用 ek_ringbuf_t 存储消息数据，recv_wait/send_wait 负责任务同步。
+ * 内部复用 ek_ringbuf_t 存储消息数据（rb 置尾，其 data[] 即消息数据区），recv_wait/send_wait 负责任务同步。
  */
 struct ek_pt_msg
 {
-    ek_ringbuf_t rb;
     ek_list_node_t recv_wait;
     ek_list_node_t send_wait;
-    uint8_t data[]; /**< 柔性数组：动态创建时消息缓冲区内嵌于此（单次分配），静态路径不使用 */
+    ek_ringbuf_t rb; /**< 置尾成员：rb.data 即消息数据区（动态=malloc 尾部，静态=union 尾部） */
 };
 #    endif /* EKCFG_PICOTHREAD_MSG */
 
@@ -200,44 +199,46 @@ void ek_pt_destroy(ek_pt_handle_t pt);
 ek_err_t ek_pt_init_static(ek_pt_t *pt, ek_pt_cb_t cb, uint8_t prio, void *arg);
 void ek_pt_deinit_static(ek_pt_t *pt);
 
-#        define EK_DEFINE_PT(handle, cb, prio, arg)                         \
-            static ek_pt_t handle;                                          \
-            static ek_err_t _static_alloc_init_##handle(void)               \
-            {                                                               \
-                return ek_pt_init_static(&(handle), (cb), (prio), (arg));   \
-            }                                                               \
+#        define EK_DEFINE_PT(handle, cb, prio, arg)                       \
+            static ek_pt_t handle;                                        \
+            static ek_err_t _static_alloc_init_##handle(void)             \
+            {                                                             \
+                return ek_pt_init_static(&(handle), (cb), (prio), (arg)); \
+            }                                                             \
             EK_STATIC_ALLOC_REGISTER(handle, 20, _static_alloc_init_##handle)
 
 #        if EKCFG_PICOTHREAD_SEM == 1
 ek_err_t ek_pt_sem_init_static(ek_pt_sem_t *sem, uint8_t count);
 void ek_pt_sem_deinit_static(ek_pt_sem_t *sem);
 
-#            define EK_DEFINE_PT_SEM(handle, count)                     \
-                static ek_pt_sem_t handle;                              \
-                static ek_err_t _static_alloc_init_##handle(void)       \
-                {                                                       \
-                    return ek_pt_sem_init_static(&(handle), (count));   \
-                }                                                       \
+#            define EK_DEFINE_PT_SEM(handle, count)                   \
+                static ek_pt_sem_t handle;                            \
+                static ek_err_t _static_alloc_init_##handle(void)     \
+                {                                                     \
+                    return ek_pt_sem_init_static(&(handle), (count)); \
+                }                                                     \
                 EK_STATIC_ALLOC_REGISTER(handle, 20, _static_alloc_init_##handle)
 #        endif /* EKCFG_PICOTHREAD_SEM */
 
 #        if EKCFG_PICOTHREAD_MSG == 1
-ek_err_t ek_pt_msg_init_static(ek_pt_msg_t *msg, void *buffer, size_t item_size, uint32_t item_amount);
+ek_err_t ek_pt_msg_init_static(ek_pt_msg_t *msg, size_t item_size, uint32_t item_amount);
 void ek_pt_msg_deinit_static(ek_pt_msg_t *msg);
 
-#            define EK_DEFINE_PT_MSG(handle, type, amount) \
-                static type handle##_storage[(amount)];    \
-                static ek_pt_msg_t handle;                 \
-                static ek_err_t _static_alloc_init_##handle(void)                         \
-                {                                                                         \
-                    return ek_pt_msg_init_static(&(handle),                               \
-                                                 handle##_storage,                        \
-                                                 sizeof(type),                            \
-                                                 (amount));                               \
-                }                                                                         \
+#            define EK_DEFINE_PT_MSG(handle, type, amount)                          \
+                static union                                                        \
+                {                                                                   \
+                    ek_pt_msg_t msg;                                                \
+                    type align_; /* 把 union 对齐抬到元素对齐 */           \
+                    uint8_t storage[sizeof(ek_pt_msg_t) + sizeof(type) * (amount)]; \
+                } handle##_mem;                                                     \
+                static ek_pt_msg_t *const handle = &handle##_mem.msg;               \
+                static ek_err_t _static_alloc_init_##handle(void)                   \
+                {                                                                   \
+                    return ek_pt_msg_init_static(handle, sizeof(type), (amount));   \
+                }                                                                   \
                 EK_STATIC_ALLOC_REGISTER(handle, 20, _static_alloc_init_##handle)
 #        endif /* EKCFG_PICOTHREAD_MSG */
-#    endif     /* EKCFG_STATIC_ALLOC */
+#    endif /* EKCFG_STATIC_ALLOC */
 
 /**
  * @brief 执行一次调度

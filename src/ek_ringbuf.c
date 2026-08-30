@@ -26,11 +26,10 @@ bool ek_ringbuf_empty(const ek_ringbuf_t *rb)
 }
 
 #        if EKCFG_STATIC_ALLOC == 1
-ek_err_t ek_ringbuf_init_static(ek_ringbuf_t *rb, void *buffer, size_t item_size, uint32_t item_amount)
+ek_err_t ek_ringbuf_init_static(ek_ringbuf_t *rb, size_t item_size, uint32_t item_amount)
 {
-    if (rb == NULL || buffer == NULL || item_size == 0U || item_amount == 0U) return EK_ERR_INVAL;
+    if (rb == NULL || item_size == 0U || item_amount == 0U) return EK_ERR_INVAL;
 
-    rb->buffer = (uint8_t *)buffer;
     rb->cap = item_amount;
     rb->item_size = item_size;
     rb->read_idx = 0U;
@@ -48,7 +47,6 @@ void ek_ringbuf_deinit_static(ek_ringbuf_t *rb)
 #            if EKCFG_RTOS == 1
     EK_LOCK_DEINIT(rb->lock);
 #            endif
-    rb->buffer = NULL;
     rb->cap = 0U;
     rb->item_size = 0U;
     rb->read_idx = 0U;
@@ -72,8 +70,6 @@ ek_ringbuf_t *ek_ringbuf_create(size_t item_size, uint32_t item_amount)
     {
         return NULL;
     }
-
-    rb->buffer = rb->data;
 
     rb->cap = item_amount;
     rb->item_size = item_size;
@@ -109,7 +105,7 @@ ek_err_t ek_ringbuf_write(ek_ringbuf_t *rb, const void *item)
         return EK_ERR_FULL;
     }
 
-    uint8_t *target = rb->buffer + (rb->write_idx * rb->item_size);
+    uint8_t *target = rb->data + (rb->write_idx * rb->item_size);
     memcpy(target, item, rb->item_size);
 
     rb->write_idx = (rb->write_idx + 1) % rb->cap;
@@ -134,7 +130,7 @@ ek_err_t ek_ringbuf_read(ek_ringbuf_t *rb, void *item)
 
     if (item != NULL)
     {
-        const uint8_t *source = rb->buffer + (rb->read_idx * rb->item_size);
+        const uint8_t *source = rb->data + (rb->read_idx * rb->item_size);
         memcpy(item, source, rb->item_size);
     }
 
@@ -159,7 +155,7 @@ ek_err_t ek_ringbuf_peek(ek_ringbuf_t *rb, void *item)
         return EK_ERR_EMPTY;
     }
 
-    const uint8_t *source = rb->buffer + (rb->read_idx * rb->item_size);
+    const uint8_t *source = rb->data + (rb->read_idx * rb->item_size);
     memcpy(item, source, rb->item_size);
 
     EK_LOCK_RELEASE(rb);
@@ -186,11 +182,10 @@ bool ek_ringbuf_empty_spsc(const ek_ringbuf_spsc_t *rb)
     return rb->read_idx == rb->write_idx;
 }
 #        if EKCFG_STATIC_ALLOC == 1
-ek_err_t ek_ringbuf_init_spsc_static(ek_ringbuf_spsc_t *rb, void *buffer, size_t item_size, uint32_t amount)
+ek_err_t ek_ringbuf_init_spsc_static(ek_ringbuf_spsc_t *rb, size_t item_size, uint32_t amount)
 {
-    if (rb == NULL || buffer == NULL || item_size == 0U || amount <= 1U) return EK_ERR_INVAL;
+    if (rb == NULL || item_size == 0U || amount <= 1U) return EK_ERR_INVAL;
 
-    rb->buffer = (uint8_t *)buffer;
     rb->cap = amount;
     rb->item_size = item_size;
     rb->read_idx = 0U;
@@ -201,7 +196,6 @@ ek_err_t ek_ringbuf_init_spsc_static(ek_ringbuf_spsc_t *rb, void *buffer, size_t
 void ek_ringbuf_deinit_spsc_static(ek_ringbuf_spsc_t *rb)
 {
     if (rb == NULL) return;
-    rb->buffer = NULL;
     rb->cap = 0U;
     rb->item_size = 0U;
     rb->read_idx = 0U;
@@ -224,8 +218,6 @@ ek_ringbuf_spsc_t *ek_ringbuf_create_spsc(size_t item_size, uint32_t item_amount
     {
         return NULL;
     }
-
-    rb->buffer = rb->data;
 
     rb->cap = item_amount;
     rb->item_size = item_size;
@@ -252,7 +244,7 @@ ek_err_t ek_ringbuf_write_spsc(ek_ringbuf_spsc_t *rb, const void *item)
         return EK_ERR_FULL;
     }
 
-    uint8_t *target = rb->buffer + (rb->write_idx * rb->item_size);
+    uint8_t *target = rb->data + (rb->write_idx * rb->item_size);
     memcpy(target, item, rb->item_size);
     rb->write_idx = next_idx;
 
@@ -270,7 +262,7 @@ ek_err_t ek_ringbuf_read_spsc(ek_ringbuf_spsc_t *rb, void *item)
 
     if (item != NULL)
     {
-        const uint8_t *source = rb->buffer + (rb->read_idx * rb->item_size);
+        const uint8_t *source = rb->data + (rb->read_idx * rb->item_size);
         memcpy(item, source, rb->item_size);
     }
 
@@ -289,7 +281,7 @@ ek_err_t ek_ringbuf_peek_spsc(ek_ringbuf_spsc_t *rb, void *item)
         return EK_ERR_EMPTY;
     }
 
-    const uint8_t *source = rb->buffer + (rb->read_idx * rb->item_size);
+    const uint8_t *source = rb->data + (rb->read_idx * rb->item_size);
     memcpy(item, source, rb->item_size);
 
     return EK_ERR_NONE;

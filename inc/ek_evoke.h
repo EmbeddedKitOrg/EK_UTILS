@@ -146,20 +146,20 @@ void ek_evoke_task_deinit_static(ek_evoke_task_t *tsk);
 ek_err_t ek_evoke_event_init_static(ek_evoke_event_t *evt, uint32_t init);
 void ek_evoke_event_deinit_static(ek_evoke_event_t *evt);
 
-#        define EK_DEFINE_EVOKE_TASK(handle, cb, arg)                        \
-            static ek_evoke_task_t handle;                                   \
-            static ek_err_t _static_alloc_init_##handle(void)                \
-            {                                                                \
-                return ek_evoke_task_init_static(&(handle), (cb), (arg));    \
-            }                                                                \
+#        define EK_DEFINE_EVOKE_TASK(handle, cb, arg)                     \
+            static ek_evoke_task_t handle;                                \
+            static ek_err_t _static_alloc_init_##handle(void)             \
+            {                                                             \
+                return ek_evoke_task_init_static(&(handle), (cb), (arg)); \
+            }                                                             \
             EK_STATIC_ALLOC_REGISTER(handle, 20, _static_alloc_init_##handle)
 
-#        define EK_DEFINE_EVOKE_EVENT(handle, init_count)                     \
-            static ek_evoke_event_t handle;                                  \
-            static ek_err_t _static_alloc_init_##handle(void)                \
-            {                                                                \
-                return ek_evoke_event_init_static(&(handle), (init_count));  \
-            }                                                                \
+#        define EK_DEFINE_EVOKE_EVENT(handle, init_count)                   \
+            static ek_evoke_event_t handle;                                 \
+            static ek_err_t _static_alloc_init_##handle(void)               \
+            {                                                               \
+                return ek_evoke_event_init_static(&(handle), (init_count)); \
+            }                                                               \
             EK_STATIC_ALLOC_REGISTER(handle, 20, _static_alloc_init_##handle)
 #    endif /* EKCFG_STATIC_ALLOC */
 

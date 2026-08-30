@@ -47,8 +47,13 @@ static volatile bool s_defer_evt_wakeup;
 
 static _defer_req_t s_defer_req_pool[EK_EVOKE_MAX_DEFER_REQ];
 static ek_list_node_t s_defer_pool_free_list;
-static ek_ringbuf_spsc_t s_isr_fifo;
-static _isr_req_t s_isr_fifo_storage[EK_EVOKE_MAX_ISR_REQ];
+static union
+{
+    ek_ringbuf_spsc_t rb;
+    _isr_req_t align_; /* 把 union 对齐抬到元素对齐 */
+    uint8_t storage[sizeof(ek_ringbuf_spsc_t) + sizeof(_isr_req_t) * EK_EVOKE_MAX_ISR_REQ];
+} s_isr_fifo_mem;
+static ek_ringbuf_spsc_t *const s_isr_fifo = &s_isr_fifo_mem.rb;
 
 static ek_list_node_t s_ready_task_list;
 static ek_list_node_t s_defer_evt_list;
@@ -92,11 +97,7 @@ void ek_evoke_init(void)
         ek_list_insert_tail(&s_defer_pool_free_list, &s_defer_req_pool[i].node);
     }
 
-    s_isr_fifo.buffer = (uint8_t *)s_isr_fifo_storage;
-    s_isr_fifo.cap = EK_EVOKE_MAX_ISR_REQ;
-    s_isr_fifo.item_size = sizeof(_isr_req_t);
-    s_isr_fifo.read_idx = 0U;
-    s_isr_fifo.write_idx = 0U;
+    ek_ringbuf_init_spsc_static(s_isr_fifo, sizeof(_isr_req_t), EK_EVOKE_MAX_ISR_REQ);
 
     s_defer_earliest_tick = UINT32_MAX;
     s_event_tick_base = 0;
@@ -323,7 +324,7 @@ ek_err_t ek_evoke_event_broadcast_from_isr(ek_evoke_event_handle_t evt, void *pa
         .evt = evt,
         .payload = payload,
     };
-    ek_err_t err = ek_ringbuf_write_spsc(&s_isr_fifo, &req);
+    ek_err_t err = ek_ringbuf_write_spsc(s_isr_fifo, &req);
     EK_ERR_GOTO(err, defer);
 
 defer:
@@ -342,7 +343,7 @@ ek_err_t ek_evoke_event_publish_from_isr(ek_evoke_event_handle_t evt, void *payl
         .evt = evt,
         .payload = payload,
     };
-    ek_err_t err = ek_ringbuf_write_spsc(&s_isr_fifo, &req);
+    ek_err_t err = ek_ringbuf_write_spsc(s_isr_fifo, &req);
     EK_ERR_GOTO(err, defer);
 
 defer:
@@ -363,7 +364,7 @@ ek_err_t ek_evoke_event_defer_from_isr(ek_evoke_event_handle_t evt, void *payloa
         .payload = payload,
         .delay = delay,
     };
-    ek_err_t err = ek_ringbuf_write_spsc(&s_isr_fifo, &req);
+    ek_err_t err = ek_ringbuf_write_spsc(s_isr_fifo, &req);
     EK_ERR_GOTO(err, defer);
 
 defer:
@@ -377,10 +378,10 @@ void ek_evoke_event_loop(void)
     {
         // 先处理是否有来自中断的请求
         // 从中断请求fifo中读取
-        while (!ek_ringbuf_empty_spsc(&s_isr_fifo))
+        while (!ek_ringbuf_empty_spsc(s_isr_fifo))
         {
             _isr_req_t req = { 0 };
-            if (ek_ringbuf_read_spsc(&s_isr_fifo, &req) == EK_ERR_NONE)
+            if (ek_ringbuf_read_spsc(s_isr_fifo, &req) == EK_ERR_NONE)
             {
                 if (req.type & ISR_REQ_PUBLISH)
                 {

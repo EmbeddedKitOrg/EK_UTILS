@@ -381,10 +381,10 @@ void ek_pt_sem_give(ek_pt_sem_handle_t sem)
 #        include "ek_ringbuf.h"
 
 #        if EKCFG_STATIC_ALLOC == 1
-ek_err_t ek_pt_msg_init_static(ek_pt_msg_t *msg, void *buffer, size_t item_size, uint32_t item_amount)
+ek_err_t ek_pt_msg_init_static(ek_pt_msg_t *msg, size_t item_size, uint32_t item_amount)
 {
     if (msg == NULL) return EK_ERR_INVAL;
-    EK_ERR_RETURN(ek_ringbuf_init_static(&msg->rb, buffer, item_size, item_amount));
+    EK_ERR_RETURN(ek_ringbuf_init_static(&msg->rb, item_size, item_amount));
     ek_list_init(&msg->recv_wait);
     ek_list_init(&msg->send_wait);
     return EK_ERR_NONE;
@@ -429,7 +429,6 @@ ek_pt_msg_handle_t ek_pt_msg_create(size_t item_size, uint32_t item_amount)
     ek_pt_msg_t *msg = (ek_pt_msg_t *)ek_malloc(sizeof(ek_pt_msg_t) + (size_t)item_amount * item_size);
     ek_assert_param(msg != NULL);
 
-    msg->rb.buffer = msg->data;
     msg->rb.cap = item_amount;
     msg->rb.item_size = item_size;
     msg->rb.read_idx = 0U;

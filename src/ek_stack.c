@@ -24,11 +24,10 @@ bool ek_stack_empty(ek_stack_t *sk)
 }
 
 #    if EKCFG_STATIC_ALLOC == 1
-ek_err_t ek_stack_init_static(ek_stack_t *sk, void *buffer, size_t item_size, uint32_t item_amount)
+ek_err_t ek_stack_init_static(ek_stack_t *sk, size_t item_size, uint32_t item_amount)
 {
-    if (sk == NULL || buffer == NULL || item_size == 0U || item_amount == 0U) return EK_ERR_INVAL;
+    if (sk == NULL || item_size == 0U || item_amount == 0U) return EK_ERR_INVAL;
 
-    sk->buffer = buffer;
     sk->sp = 0U;
     sk->cap = item_amount;
     sk->item_size = item_size;
@@ -44,7 +43,6 @@ void ek_stack_deinit_static(ek_stack_t *sk)
 #        if EKCFG_RTOS == 1
     EK_LOCK_DEINIT(sk->lock);
 #        endif
-    sk->buffer = NULL;
     sk->sp = 0U;
     sk->cap = 0U;
     sk->item_size = 0U;
@@ -66,8 +64,6 @@ ek_stack_t *ek_stack_create(size_t item_size, uint32_t item_amount)
     {
         return NULL;
     }
-
-    sk->buffer = sk->data;
 
     sk->sp = 0U;
     sk->cap = item_amount;
@@ -101,7 +97,7 @@ ek_err_t ek_stack_push(ek_stack_t *sk, const void *item)
         return EK_ERR_FULL;
     }
 
-    uint8_t *target = (uint8_t *)sk->buffer + sk->sp * sk->item_size;
+    uint8_t *target = sk->data + sk->sp * sk->item_size;
     memcpy(target, item, sk->item_size);
     sk->sp++;
 
@@ -124,7 +120,7 @@ ek_err_t ek_stack_pop(ek_stack_t *sk, void *item)
     }
 
     sk->sp--;
-    uint8_t *source = (uint8_t *)sk->buffer + sk->sp * sk->item_size;
+    uint8_t *source = sk->data + sk->sp * sk->item_size;
     memcpy(item, source, sk->item_size);
 
     EK_LOCK_RELEASE(sk);

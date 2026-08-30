@@ -26,20 +26,19 @@
 /**
  * @brief 栈结构体
  *
- * 封装了栈的基本属性，包括缓冲区指针、栈顶指针、元素大小和容量。
+ * 封装了栈的基本属性，包括栈顶指针、元素大小和容量。
  */
 typedef struct ek_stack ek_stack_t;
 
 struct ek_stack
 {
-    void *buffer; /**< 数据区起始指针：动态创建时指向尾部 data[]，静态初始化时指向外部存储 */
     uint32_t sp; /**< 栈顶指针（stack pointer），指向下一个写入位置 */
     size_t item_size; /**< 单个元素的大小（字节） */
     uint32_t cap; /**< 栈的最大容量 */
 #    if EKCFG_RTOS == 1
     EK_LOCK_TYPE lock;
 #    endif /* EKCFG_RTOS */
-    uint8_t data[]; /**< 柔性数组：动态创建时缓冲区内嵌于此（单次分配），静态路径不使用 */
+    uint8_t data[]; /**< 唯一数据位置：动态=malloc 尾部，静态=union 尾部 */
 };
 
 #    ifdef __cplusplus
@@ -87,7 +86,7 @@ ek_stack_t *ek_stack_create(size_t item_size, uint32_t item_amount);
 /**
  * @brief 销毁栈并释放内存
  *
- * 释放栈及其内部缓冲区占用的所有内存。
+ * 释放栈占用的内存（控制块与数据区同块）。
  *
  * @param sk 栈指针
  *
@@ -100,16 +99,21 @@ void ek_stack_destroy(ek_stack_t *sk);
 #    if EKCFG_STATIC_ALLOC == 1
 #        include "ek_static_alloc.h"
 
-ek_err_t ek_stack_init_static(ek_stack_t *sk, void *buffer, size_t item_size, uint32_t item_amount);
+ek_err_t ek_stack_init_static(ek_stack_t *sk, size_t item_size, uint32_t item_amount);
 void ek_stack_deinit_static(ek_stack_t *sk);
 
-#        define EK_DEFINE_STACK(handle, type, amount)                                           \
-            static type handle##_storage[(amount)];                                             \
-            static ek_stack_t handle;                                                           \
-            static ek_err_t _static_alloc_init_##handle(void)                                   \
-            {                                                                                   \
-                return ek_stack_init_static(&(handle), handle##_storage, sizeof(type), amount); \
-            }                                                                                   \
+#        define EK_DEFINE_STACK(handle, type, amount)                          \
+            static union                                                       \
+            {                                                                  \
+                ek_stack_t sk;                                                 \
+                type align_; /* 把 union 对齐抬到元素对齐 */          \
+                uint8_t storage[sizeof(ek_stack_t) + sizeof(type) * (amount)]; \
+            } handle##_mem;                                                    \
+            static ek_stack_t *const handle = &handle##_mem.sk;                \
+            static ek_err_t _static_alloc_init_##handle(void)                  \
+            {                                                                  \
+                return ek_stack_init_static(handle, sizeof(type), (amount));   \
+            }                                                                  \
             EK_STATIC_ALLOC_REGISTER(handle, 10, _static_alloc_init_##handle)
 #    endif
 
