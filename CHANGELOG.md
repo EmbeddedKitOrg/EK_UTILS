@@ -4,6 +4,32 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.1.0] - 2026-08-30
+
+相对 [v2.0.0rc](https://github.com/EmbeddedKitOrg/EK_UTILS/releases/tag/v2.0.0rc) 的正式版本。
+
+### 新增
+
+- 快照数据模块 `ek_snapshot`（`EKCFG_SNAPSHOT`，默认关闭）：单槽快照，生产者以唯一 id（`unique`，0 表示无数据）覆盖写入，消费者随时整块读取最新值；控制块与数据单次分配（柔性数组内联），支持动态创建与 `EK_SNAPSHOT_DEFINE(handle, size)` 静态定义。
+
+### 变更
+
+- 容器静态分配改为 **union 容器**模式：`EK_DEFINE_*` 展开为 union（控制块与数据物理连续），`handle` 从对象变为 `T *const` 指针，用法与动态创建返回值统一（`&handle` → `handle`）；容器结构体的 `data[]` 柔性数组成为唯一数据位置，动态（malloc 尾部）与静态（union 尾部）读写代码零区分。
+- 容器结构体删除 `buffer` 字段：`ek_ringbuf_t` / `ek_ringbuf_spsc_t` / `ek_stack_t` / `ek_snapshot_t` / `ek_pt_msg_t` 不再保存数据区指针，读写直接访问 `data[]`，相比 2.0.0rc 每对象减少 4 字节并少一次堆操作。
+- `*_init_static()` 签名删除 buffer 参数（数据内嵌于 union，无需外部挂载）：`ek_ringbuf_init_static(rb, item_size, item_amount)`、`ek_ringbuf_init_spsc_static(rb, item_size, amount)`、`ek_stack_init_static(sk, item_size, item_amount)`、`ek_pt_msg_init_static(msg, item_size, item_amount)`、`ek_snapshot_init_static(snapshot, data_size)`。
+- `ek_pt_msg_t` 成员重排：`recv_wait` / `send_wait` 在前，`ek_ringbuf_t rb` 置尾，`rb.data` 即消息数据区。
+- evoke 内部 ISR FIFO 同步改为 union 容器（对外 API 无变化）。
+- 版本宏更新：`EK_VERSION_MINOR` 0 → 1。
+
+### 破坏性变更
+
+从 2.0.0rc 升级必须改调用点，无兼容别名：
+
+- `EK_DEFINE_*` 展开的句柄从对象变为 `const` 指针：所有 `&handle` 用法改为 `handle`。
+- 直接访问容器 `.buffer` 字段的代码改为 `data[]`（数据始终紧跟控制头）。
+- 静态初始化函数调用的实参需按新签名去除 buffer/storage 实参。
+- 依赖 `ek_pt_msg_t` 字段偏移的代码需按新布局（`recv_wait` / `send_wait` / `rb`）调整。
+
 ## [2.0.0rc] - 2026-08-14
 
 相对 [v1.2.0](https://github.com/EmbeddedKitOrg/EK_UTILS/releases/tag/v1.2.0) 的预发布版本。包含破坏性 API 变更，请勿当作稳定版依赖。
@@ -37,3 +63,4 @@
 - 启用静态分配时，链接脚本必须增加 `.ek_static_alloc` 段（`KEEP(*(SORT(.ek_static_alloc*)))`，符号 `_ek_static_alloc_start` / `_ek_static_alloc_end`）。
 
 [2.0.0rc]: https://github.com/EmbeddedKitOrg/EK_UTILS/compare/v1.2.0...v2.0.0rc
+[2.1.0]: https://github.com/EmbeddedKitOrg/EK_UTILS/compare/v2.0.0rc...v2.1.0
